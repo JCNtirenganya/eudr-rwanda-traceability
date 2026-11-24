@@ -3,6 +3,8 @@
 Static web app (ES modules, no build step) hosted on GitHub Pages. **Portal sign-in, Supabase storage.**
 Run locally with `python -m http.server` → http://localhost:8000 · Deploy: push to `main`.
 
+Repo: https://github.com/JCNtirenganya/eudr-rwanda-traceability · Site: https://jcntirenganya.github.io/eudr-rwanda-traceability/
+
 ## Architecture
 
 ```
@@ -75,7 +77,7 @@ the app keeps working on the Supabase copy.
 
 The app still signs in at `https://gis.naeb.gov.rw/portal`. As a Portal org administrator:
 
-1. Organization → Settings → Security → **Allowed Origins** → add `https://<account>.github.io`
+1. Organization → Settings → Security → **Allowed Origins** → add `https://jcntirenganya.github.io`
    (and `http://localhost:8000` for local testing). Token requests send the browser origin as the
    referer; without this, sign-in fails with a CORS/token error.
 2. Create a dedicated read-only account for the scheduled importer, e.g. `coffee_trace_sync`, and
