@@ -1,0 +1,2515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="NAEB coffee traceability network — importer to plot chain of custody with EUDR compliance">
+<title>Rwanda Coffee Traceability MVP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --forest:#4B5A50;
+    --forest-dark:#2B1E16;
+    --parchment:#FAF7F2;
+    --card:#FFFFFF;
+    --rust:#8C4A3E;
+    --amber:#B08F55;
+    --ink:#2A2620;
+    --ink-soft:#6B6459;
+    --ink-hover:#453D32;
+    --line:#E4DFD2;
+    --neutral-soft:#EDEAE2;
+    --neutral-border:#D8D2C2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'IBM Plex Sans',Arial,sans-serif;background:#FAF7F2;color:var(--ink);line-height:1.45;}
+  .wrap{max-width:1300px;margin:0 auto;padding:0 0 40px;}
+
+  header{
+    background:rgba(43, 30, 22, 0.88);
+    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(10px);
+    color:#F2EFE3;padding:22px 28px;
+    display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 32% 30%, #6B6459, #2A2620 75%);flex:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.15);overflow:hidden;display:flex;align-items:center;justify-content:center;}
+  .brand-mark img{width:100%;height:100%;object-fit:cover;}
+  h1{font-family:'IBM Plex Sans',Arial,sans-serif;font-weight:700;font-size:23px;margin:0;letter-spacing:0.2px;}
+  .brand-sub{font-size:12.5px;color:#C9C3AE;margin-top:3px;}
+  .header-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-export,.btn-csv{
+    border:none;border-radius:3px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .btn-export{background:var(--ink);color:#F2EFE3;}
+  .btn-export:hover{background:var(--ink-hover);}
+  .btn-csv{background:transparent;color:#E8DFC8;border:1px solid #6D6752;}
+  .btn-csv:hover{background:rgba(255,255,255,0.08);}
+  .btn-link{background:transparent;color:#E8DFC8;border:1px solid #6D6752;}
+  .btn-link:hover{background:rgba(255,255,255,0.08);}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translate(-50%,12px);background:var(--forest-dark);
+    color:#F2EFE3;padding:10px 18px;border-radius:5px;font-size:12.5px;font-weight:600;
+    box-shadow:0 6px 18px rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.16);opacity:0;pointer-events:none;
+    transition:opacity .18s ease,transform .18s ease;z-index:500;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .search-box{position:relative;margin:6px 6px 4px;}
+  .search-box input{
+    width:100%;padding:7px 28px 7px 10px;border:1px solid var(--line);border-radius:4px;
+    font-size:12px;font-family:'IBM Plex Sans',sans-serif;background:#FBFAF5;color:var(--ink);
+  }
+  .search-box input:focus{outline:2px solid var(--ink);outline-offset:1px;}
+  .search-box .clear-search{
+    position:absolute;right:5px;top:50%;transform:translateY(-50%);border:none;background:none;
+    color:var(--ink-soft);cursor:pointer;font-size:14px;line-height:1;padding:3px 4px;display:none;
+  }
+  .search-box .clear-search.show{display:block;}
+  .search-box .clear-search:hover{color:var(--ink);}
+  .explorer-list li.no-match{display:none;}
+  mark{background:var(--neutral-soft);color:var(--ink);padding:0 1px;border-radius:2px;}
+  .print-only{display:none;}
+  @media print{ .print-only{display:inline;} }
+
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{background:var(--ink-hover);}
+  th.sortable .arrow{display:inline-block;width:9px;opacity:0.5;font-size:9px;margin-left:2px;}
+  th.sortable.sorted .arrow{opacity:1;}
+
+  .toolbar{
+    margin:22px 28px 0;background:var(--card);border:1px solid var(--line);border-radius:6px;
+    padding:14px 18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;
+  }
+  .filters{display:flex;gap:10px;flex-wrap:wrap;flex:1;align-items:flex-end;}
+  .filter-group{display:flex;flex-direction:column;gap:3px;min-width:150px;}
+  .filter-group label{font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);font-weight:600;}
+  .filter-group select{
+    padding:7px 9px;border:1px solid var(--line);border-radius:4px;font-size:12.5px;
+    font-family:'IBM Plex Sans',sans-serif;background:#FBFAF5;min-width:150px;max-width:210px;
+    color:var(--ink);
+  }
+  .filter-group select:focus{outline:2px solid var(--ink);outline-offset:1px;}
+  .btn-clear{
+    background:none;border:1px solid var(--ink-soft);color:var(--ink-soft);border-radius:4px;
+    padding:7px 12px;font-size:12.5px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+  }
+  .btn-clear:hover{background:var(--neutral-soft);color:var(--ink);border-color:var(--ink);}
+  .path{flex:1;min-width:260px;font-size:12.5px;color:var(--ink-soft);}
+  .path b{color:var(--ink);}
+  .path .chip{
+    display:inline-block;background:var(--neutral-soft);color:var(--ink);border-radius:3px;
+    padding:2px 7px;margin:0 3px;font-size:11.5px;font-weight:600;
+  }
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 28px 0;}
+  .stat{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:4px;padding:13px 16px;transition:transform .15s ease;}
+  .stat.flash{transform:translateY(-2px);}
+  .stat.compliant{border-left-color:var(--forest);}
+  .stat-val{font-family:'IBM Plex Sans',Arial,sans-serif;font-size:24px;font-weight:600;color:var(--ink);}
+  .stat.compliant .stat-val{color:var(--forest);}
+  .stat-lbl{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+
+  .grid{display:grid;grid-template-columns:230px 1.1fr 1.2fr;gap:14px;margin:16px 28px 0;align-items:start;}
+  @media (max-width:1080px){ .grid{grid-template-columns:1fr;} }
+  .card-box{background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .card-box h2{
+font-family:'IBM Plex Sans',Arial,sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);
+    margin:0;padding:12px 16px;border-bottom:1px solid var(--line);background:#FAF8F0;
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .card-box h2 .hint{font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:500;color:var(--ink-soft);}
+
+  .tabs{display:flex;border-bottom:1px solid var(--line);}
+  .tab{
+    flex:1;text-align:center;padding:9px 2px;font-size:10.5px;font-weight:600;color:var(--ink-soft);
+    cursor:pointer;background:#FAF8F0;letter-spacing:0.2px;border:none;font-family:inherit;
+  }
+  .tab:hover{background:#F5F1E3;}
+  .tab.active{color:var(--ink);background:var(--card);box-shadow:inset 0 -2px 0 var(--ink);}
+  .tab .count{
+    display:inline-block;min-width:15px;padding:0 4px;margin-left:2px;border-radius:8px;
+    background:#E7E1CF;color:var(--ink-soft);font-size:9.5px;line-height:15px;
+  }
+  .tab.active .count{background:var(--neutral-soft);color:var(--ink);}
+  .explorer-list{list-style:none;margin:0;padding:6px;max-height:520px;overflow-y:auto;}
+  .explorer-list li{
+    padding:9px 10px;border-radius:4px;font-size:12.5px;margin-bottom:2px;
+    display:flex;flex-direction:column;gap:2px;opacity:0.45;transition:opacity .12s ease,background .12s ease;
+    cursor:pointer;border:1px solid transparent;
+  }
+  .explorer-list li:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+  .explorer-list li .name{font-weight:600;color:var(--ink);}
+  .explorer-list li .meta{font-size:10.5px;color:var(--ink-soft);}
+  .explorer-list li:hover{background:#F5F1E3;}
+  .explorer-list li.in-network{opacity:1;}
+  .explorer-list li.active{opacity:1;background:var(--neutral-soft);border-color:var(--neutral-border);}
+  .explorer-list li.active .name{color:var(--ink);}
+  .explorer-list.no-selection li{opacity:1;}
+
+  .badge{display:inline-block;padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;}
+  .badge-compliant{background:var(--forest);}
+  .badge-pending{background:var(--rust);}
+  .badge-amber{background:var(--amber);color:#241A08;}
+  .badge-atrisk{background:var(--amber);color:#241A08;}
+  .badge-noncompliant{background:var(--rust);}
+
+  #map{height:430px;width:100%;}
+
+  /* ---- View toggle (Graph / Map) ---- */
+  .view-toggle{display:inline-flex;border:1px solid var(--neutral-border);border-radius:4px;overflow:hidden;}
+  .view-toggle button{
+    border:none;background:var(--card);color:var(--ink-soft);font-size:10.5px;font-weight:600;
+    padding:5px 10px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;letter-spacing:0.2px;
+  }
+  .view-toggle button+button{border-left:1px solid var(--neutral-border);}
+  .view-toggle button.active{background:var(--ink);color:#F2EFE3;}
+  .view-toggle button:hover:not(.active){background:var(--neutral-soft);color:var(--ink);}
+
+  /* ---- Knowledge graph view ---- */
+  #graphWrap{position:relative;height:430px;width:100%;background:#FBFAF5;overflow:hidden;cursor:grab;}
+  #graphWrap.panning{cursor:grabbing;}
+  #graphSvg{width:100%;height:100%;display:block;}
+  #graphViewport.g-animate{transition:transform .58s cubic-bezier(.2,.7,.3,1);}
+  .g-edge{stroke:#C9C2AC;stroke-width:1.1;fill:none;transition:opacity .15s ease,stroke .15s ease,stroke-width .15s ease;}
+  .g-edge.g-edge-active{stroke:#8F6626;stroke-width:2;stroke-dasharray:5 4;}
+  .g-edge.g-edge-dim{opacity:0.12;}
+  .g-node{cursor:pointer;}
+  .g-node circle.g-dot{transition:opacity .15s ease,stroke .15s ease,stroke-width .15s ease,r .1s ease;}
+  .g-node.g-dim circle.g-dot{opacity:0.25;}
+  .g-node.g-dim text{opacity:0.22;}
+  .g-node.g-active circle.g-dot{stroke:#241A08;stroke-width:3;filter:drop-shadow(0 0 4px rgba(143,102,38,0.55));}
+  .g-node text{
+    font-family:'IBM Plex Sans',sans-serif;font-size:9.5px;font-weight:600;fill:var(--ink);
+    pointer-events:none;paint-order:stroke;stroke:#FBFAF5;stroke-width:3px;stroke-linejoin:round;
+  }
+  .g-node.g-leaf text{font-size:8px;font-weight:500;fill:var(--ink-soft);}
+  .g-node:focus-visible circle.g-dot{outline:2px solid var(--ink);outline-offset:2px;}
+  .g-col-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:0.5px;text-transform:uppercase;fill:var(--ink-soft);opacity:0.7;}
+  .graph-tooltip{
+    position:absolute;pointer-events:none;background:var(--forest-dark);color:#F2EFE3;
+    padding:7px 10px;border-radius:5px;font-size:11px;line-height:1.5;max-width:220px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.25);opacity:0;transform:translate(-50%,-100%);
+    transition:opacity .1s ease;z-index:20;white-space:nowrap;
+  }
+  .graph-tooltip.show{opacity:1;}
+  .graph-tooltip b{display:block;font-size:11.5px;margin-bottom:1px;color:#fff;}
+  .graph-tooltip .gt-meta{color:#C9C3AE;font-size:10px;}
+  .graph-controls{position:absolute;top:8px;left:8px;display:flex;flex-direction:column;gap:3px;z-index:15;}
+  .graph-controls button{
+    width:24px;height:24px;border-radius:3px;border:1px solid var(--neutral-border);background:#fff;
+    color:var(--ink);font-size:13px;line-height:1;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.12);
+  }
+  .graph-controls button:hover{background:var(--neutral-soft);}
+  .graph-controls button.active{background:var(--ink);color:#F2EFE3;}
+  .graph-controls button.active:hover{background:var(--ink-hover);}
+  .graph-controls button:disabled{opacity:0.35;cursor:default;box-shadow:none;}
+  .graph-controls button:disabled:hover{background:#fff;}
+  .graph-controls .g-sep{height:1px;background:var(--neutral-border);margin:2px 3px;}
+  #graphWrap.graph-no-labels .g-node text{display:none;}
+  .g-node .g-icon{pointer-events:none;}
+  .graph-hint-badge{
+    position:absolute;bottom:8px;right:10px;font-size:10px;color:var(--ink-soft);background:rgba(255,255,255,0.85);
+    padding:3px 8px;border-radius:3px;z-index:15;pointer-events:none;
+  }
+  #mapCard.map-fullscreen #graphWrap{flex:1 1 auto;height:auto;}
+  @media print{ #graphWrap{display:none !important;} #map{display:block !important;} }
+
+  .map-legend{display:flex;gap:6px;padding:9px 16px;border-top:1px solid var(--line);background:#FAF8F0;font-size:10.5px;color:var(--ink-soft);flex-wrap:wrap;align-items:center;}
+  .map-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .map-legend span[data-filter]{cursor:pointer;padding:4px 7px;border-radius:4px;border:1px solid transparent;transition:background .12s ease,border-color .12s ease,color .12s ease;}
+  .map-legend span[data-filter]:hover{background:#F0EBDC;}
+  .map-legend span[data-filter]:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+  .map-legend span[data-filter].legend-active{background:var(--neutral-soft);border-color:var(--neutral-border);color:var(--ink);font-weight:600;}
+  .legend-reset{display:none;margin-left:auto;background:none;border:1px solid var(--line);border-radius:4px;padding:4px 10px;font-size:10px;cursor:pointer;color:var(--ink-soft);font-family:inherit;}
+  .legend-reset.show{display:inline-block;}
+  .legend-reset:hover{background:var(--neutral-soft);color:var(--ink);}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block;}
+  .sw-hachure-green{background:repeating-linear-gradient(45deg, #2F4B3C 0 2px, rgba(47,75,60,0.14) 2px 6px);border:1.5px solid #F7CF3B;}
+  .sw-hachure-amber{background:repeating-linear-gradient(45deg, #C99A3A 0 2px, rgba(201,154,58,0.18) 2px 6px);border:1.5px solid #F7CF3B;}
+  .sw-hachure-rust{background:repeating-linear-gradient(45deg, #A23E2C 0 2px, rgba(162,62,44,0.16) 2px 6px);border:1.5px solid #F7CF3B;}
+  .sw-hachure-dim{background:repeating-linear-gradient(45deg, #8f897a 0 2px, rgba(140,135,120,0.10) 2px 6px);border:1.5px solid #c9c3ae;}
+
+  /* Pulse effect for non-compliant / needs-verification farms on the map */
+  @keyframes pulseAtRisk{
+    0%,100%{ stroke-width:2px; filter:none; }
+    50%{ stroke-width:4px; filter:drop-shadow(0 0 5px rgba(201,154,58,0.9)); }
+  }
+  @keyframes pulseNonCompliant{
+    0%,100%{ stroke-width:2px; filter:none; }
+    50%{ stroke-width:4.5px; filter:drop-shadow(0 0 6px rgba(162,62,44,0.95)); }
+  }
+  .plot-pulse-atrisk{ animation:pulseAtRisk 1.8s ease-in-out infinite; }
+  .plot-pulse-noncompliant{ animation:pulseNonCompliant 1.4s ease-in-out infinite; }
+  @media print{ .plot-pulse-atrisk,.plot-pulse-noncompliant{ animation:none !important; } }
+  @media (prefers-reduced-motion: reduce){ .plot-pulse-atrisk,.plot-pulse-noncompliant{ animation:none !important; } }
+
+  /* Full-page map mode */
+  #mapCard.map-fullscreen{
+    position:fixed;inset:0;z-index:3000;margin:0;border-radius:0;
+    display:flex;flex-direction:column;max-width:none;
+  }
+  #mapCard.map-fullscreen #map{flex:1 1 auto;height:auto;}
+  #mapCard.map-fullscreen .map-legend{flex:none;}
+  body.map-fullscreen-active{overflow:hidden;}
+
+  .leaflet-control .map-tool-btn{
+    display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+    background:#fff;font-size:15px;line-height:1;color:#2A2620;text-decoration:none;font-family:inherit;
+  }
+  .leaflet-control .map-tool-btn:hover{background:#f2efe3;}
+  .leaflet-control-layers-toggle{width:28px !important;height:28px !important;}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{text-align:left;padding:9px 12px;background:var(--ink);color:#F2EFE3;font-weight:600;font-size:11px;letter-spacing:0.2px;position:sticky;top:0;}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr{cursor:pointer;transition:opacity .12s ease,background .1s ease;opacity:0.4;}
+  tbody tr:hover{background:#F5F1E3;}
+  tbody tr:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
+  tbody tr.in-network{opacity:1;}
+  tbody tr.active{background:var(--neutral-soft);opacity:1;}
+  tbody tr.no-selection{opacity:1;}
+  .batch-id{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);}
+  .table-scroll{max-height:430px;overflow-y:auto;}
+
+  .detail{margin:16px 28px 0;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:0;display:none;}
+  .detail.open{display:block;}
+  .detail-head{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 20px;border-bottom:1px solid var(--line);background:#FAF8F0;
+  }
+  .detail-head h2{font-family:'IBM Plex Sans',Arial,sans-serif;font-size:15px;font-weight:600;color:var(--ink);margin:0;}
+  .detail-type{
+    display:inline-block;background:var(--ink);color:#F2EFE3;border-radius:3px;
+    padding:2px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-right:8px;
+    vertical-align:middle;
+  }
+  .detail-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;}
+  .detail-field{padding:12px 20px;border-bottom:1px solid #F0EBDC;border-right:1px solid #F0EBDC;}
+  .detail-field .k{font-size:10.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);font-weight:600;margin-bottom:4px;}
+  .detail-field .v{font-size:13.5px;color:var(--ink);}
+  .link-chip{
+    display:inline-block;background:var(--neutral-soft);color:var(--ink);border:1px solid var(--neutral-border);
+    border-radius:3px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11.5px;font-weight:600;cursor:pointer;
+    font-family:inherit;
+  }
+  .link-chip:hover{background:var(--ink);color:#F2EFE3;}
+  .link-chip:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+  .eudr-row{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12px;}
+  .eudr-row .farm-name{font-weight:600;}
+
+  .lineage{
+    margin:16px 28px 0;background:var(--card);border:1px solid var(--line);border-radius:6px;
+    padding:14px 20px;display:flex;align-items:center;gap:0;overflow-x:auto;
+  }
+  .lineage h2{font-family:'IBM Plex Sans',Arial,sans-serif;font-size:14.5px;font-weight:600;color:var(--ink);margin:0 18px 0 0;flex:none;}
+  .step{display:flex;align-items:center;gap:9px;flex:none;padding:4px 6px;border-radius:4px;transition:background .15s ease;}
+  .step.in-chain{background:var(--neutral-soft);}
+  .step-num{
+    width:22px;height:22px;border-radius:50%;background:var(--ink);color:#F2EFE3;font-size:10.5px;
+    font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .step.in-chain .step-num{background:var(--ink-hover);}
+  .step-lbl{font-size:12px;color:var(--ink);white-space:nowrap;}
+  .step-lbl small{display:block;font-size:10px;color:var(--ink-soft);}
+  .step-arrow{color:var(--line);margin:0 8px;font-size:15px;flex:none;}
+
+  footer{margin:20px 28px 0;font-size:11px;color:var(--ink-soft);padding-top:14px;border-top:1px solid var(--line);}
+  footer code{background:#E7E1CF;padding:1px 5px;border-radius:3px;}
+
+  .report{display:none;}
+  .report .rep-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--ink);padding-bottom:10px;margin-bottom:4px;}
+  .report .rep-head h1{font-family:'IBM Plex Sans',Arial,sans-serif;font-size:19px;color:var(--ink);margin:0;}
+  .report .rep-head .rep-meta{text-align:right;font-size:10.5px;color:var(--ink-soft);}
+  .report .rep-meta code{background:#E7E1CF;padding:1px 5px;border-radius:3px;}
+  .report .rep-section{margin-top:20px;}
+  .report .rep-note{background:#FAF8F0;border-left:3px solid var(--ink-soft);padding:8px 12px;font-size:12px;margin:8px 0 4px;}
+  .report .rep-foot{margin-top:22px;padding-top:8px;border-top:1px solid var(--line);font-size:10px;color:var(--ink-soft);display:flex;justify-content:space-between;}
+  /* Row-level indicators in the printed EUDR summary: red = non-compliant
+     (deforestation flag), amber = needs verification. */
+  .report tbody tr.row-noncompliant td{background:rgba(162,62,44,0.10);}
+  .report tbody tr.row-noncompliant td:first-child{box-shadow:inset 3px 0 0 var(--rust);}
+  .report tbody tr.row-atrisk td{background:rgba(201,154,58,0.16);}
+  .report tbody tr.row-atrisk td:first-child{box-shadow:inset 3px 0 0 var(--amber);}
+
+  @media print{
+    @page{ margin:16mm 14mm; }
+    body{background:#fff;}
+    .header-actions,.toolbar,.tabs,.search-box,.explorer-list,.lineage,.detail,.toast,.print-hide,#mapHint,.leaflet-control-container,.legend-reset{display:none !important;}
+    .grid{grid-template-columns:1fr;}
+    #mapCard{margin-bottom:18px;}
+    #map{height:340px;}
+    .map-legend{font-size:10px;}
+    tbody tr{opacity:1 !important;}
+    .report{display:block;margin:0 28px;}
+    .report h2{font-family:'IBM Plex Sans',Arial,sans-serif;font-size:14px;color:var(--ink);border-bottom:2px solid var(--ink);padding-bottom:4px;margin-bottom:8px;}
+    .report table{margin-bottom:16px;}
+    .report .stat{display:inline-block;width:13%;min-width:120px;margin:0 8px 8px 0;background:#FAF8F0;}
+    .report .stat-val{font-size:17px;}
+    .card-box,.stat,.report table,.report .rep-section,.lineage{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <img src="https://gis.naeb.gov.rw/portal/sharing/rest/content/items/88edd472f4a14d6489c75398b04169ea/data" alt="" onerror="this.remove()">
+      </div>
+      <div>
+        <h1>Rwanda Coffee Traceability MVP</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-link" id="btnCopyLink" type="button">Copy link to selection</button>
+      <button class="btn-csv" id="btnCsv" type="button">Export CSV</button>
+      <button class="btn-export" id="btnPrint" type="button">Print / PDF Report</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="filters">
+      <div class="filter-group">
+        <label for="filterImporter">1 · Importer</label>
+        <select id="filterImporter"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="filterAggregator">2 · Aggregator</label>
+        <select id="filterAggregator"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="filterStation">3 · Station</label>
+        <select id="filterStation"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="filterFarmer">4 · Farmer</label>
+        <select id="filterFarmer"><option value="">All</option></select>
+      </div>
+    </div>
+    <button class="btn-clear" id="btnClear" type="button">Clear selection</button>
+    <div class="path" id="pathText">Pick an importer to trace its chain downstream — through batches, aggregators and stations — down to each farmer's farm. EUDR status is tracked per plot.</div>
+  </div>
+
+  <div class="stats print-hide">
+    <div class="stat" id="stFarmers"><div class="stat-val" id="vFarmers">—</div><div class="stat-lbl">Farmers in scope</div></div>
+    <div class="stat" id="stPlots"><div class="stat-val" id="vPlots">—</div><div class="stat-lbl">Farms (plots) in scope</div></div>
+    <div class="stat" id="stArea"><div class="stat-val" id="vArea">—</div><div class="stat-lbl">Cultivated area in scope</div></div>
+    <div class="stat" id="stStations"><div class="stat-val" id="vStations">—</div><div class="stat-lbl">Stations in scope</div></div>
+    <div class="stat" id="stBatches"><div class="stat-val" id="vBatches">—</div><div class="stat-lbl">Export batches in scope</div></div>
+    <div class="stat" id="stVolume"><div class="stat-val" id="vVolume">—</div><div class="stat-lbl">Export volume in scope</div></div>
+    <div class="stat compliant" id="stComp"><div class="stat-val" id="vComp">—</div><div class="stat-lbl">EUDR-compliant farms</div></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card-box print-hide">
+      <div class="tabs" role="tablist" aria-label="Explorer">
+        <button class="tab active" data-tab="farmer" role="tab" aria-selected="true" type="button">Farmers<span class="count" id="cntFarmer"></span></button>
+        <button class="tab" data-tab="plot" role="tab" aria-selected="false" type="button">Farms<span class="count" id="cntPlot"></span></button>
+        <button class="tab" data-tab="station" role="tab" aria-selected="false" type="button">Stations<span class="count" id="cntStation"></span></button>
+        <button class="tab" data-tab="aggregator" role="tab" aria-selected="false" type="button">Agg.<span class="count" id="cntAggregator"></span></button>
+        <button class="tab" data-tab="importer" role="tab" aria-selected="false" type="button">Importers<span class="count" id="cntImporter"></span></button>
+        <button class="tab" data-tab="recent" role="tab" aria-selected="false" type="button">Records<span class="count" id="cntRecent"></span></button>
+      </div>
+      <div class="search-box">
+        <input type="text" id="explorerSearch" placeholder="Search this list…" aria-label="Search entities in the current tab" autocomplete="off">
+        <button type="button" class="clear-search" id="clearSearch" aria-label="Clear search">&times;</button>
+      </div>
+      <ul class="explorer-list no-selection" id="explorerList" role="listbox" aria-label="Entities"></ul>
+    </div>
+
+    <div class="card-box" id="mapCard">
+      <h2>Traceability network
+        <span class="view-toggle" role="tablist" aria-label="View mode">
+          <button type="button" data-view="graph" id="viewTabGraph" role="tab" aria-selected="false">Graph</button>
+          <button type="button" class="active" data-view="map" id="viewTabMap" role="tab" aria-selected="true">Map</button>
+        </span>
+        <span class="hint" id="mapHint">Click a node to trace a chain</span><span class="hint print-only">Highlighted = in scope for current selection</span>
+      </h2>
+      <div id="graphWrap" style="display:none;">
+        <svg id="graphSvg"></svg>
+        <div class="graph-controls">
+          <button type="button" id="graphZoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+          <button type="button" id="graphZoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
+          <button type="button" id="graphZoomReset" title="Reset view" aria-label="Reset view">&#9679;</button>
+          <div class="g-sep" aria-hidden="true"></div>
+          <button type="button" id="graphLabelToggle" class="active" title="Hide labels" aria-pressed="true" aria-label="Toggle node labels">Aa</button>
+          <button type="button" id="graphSelectToggleBtn" title="Clear selection" aria-label="Clear selection" disabled>&#10005;</button>
+          <button type="button" id="graphFullscreenBtn" class="fullscreen-toggle-btn" title="Open full-page graph" aria-label="Open full-page graph">⤢</button>
+        </div>
+        <div class="graph-hint-badge" id="graphHintBadge">Drag nodes · scroll to zoom · click to trace</div>
+        <div class="graph-tooltip" id="graphTooltip"></div>
+      </div>
+      <div id="map"></div>
+      <div class="map-legend" id="graphLegend" style="display:none;">
+        <span><i class="sw" style="background:#6B6459;border:1px solid #2A2620;border-radius:50%;"></i>Farmer</span>
+        <span data-filter="compliant" role="button" tabindex="0" title="Filter graph to compliant farms"><i class="sw" style="background:#4B5A50;border:1px solid #2A2620;border-radius:50%;"></i>Compliant farm</span>
+        <span data-filter="atrisk" role="button" tabindex="0" title="Filter graph to farms needing verification"><i class="sw" style="background:#B08F55;border:1px solid #2A2620;border-radius:50%;"></i>Needs verification</span>
+        <span data-filter="noncompliant" role="button" tabindex="0" title="Filter graph to non-compliant farms"><i class="sw" style="background:#8C4A3E;border:1px solid #2A2620;border-radius:50%;"></i>Non-compliant</span>
+        <span><i class="sw" style="background:#B8863B;border:1px solid #2A2620;border-radius:50%;"></i>Station</span>
+        <span><i class="sw" style="background:#7A6A45;border:1px solid #2A2620;border-radius:50%;"></i>Aggregator / Batch</span>
+        <span><i class="sw" style="background:#2A2620;border:1px solid #2A2620;border-radius:50%;"></i>Importer</span>
+        <button type="button" class="legend-reset" id="graphLegendReset">Reset filter</button>
+      </div>
+      <div class="map-legend" id="mapLegend">
+        <span data-filter="compliant" role="button" tabindex="0" title="Filter map to compliant farms"><i class="sw sw-hachure-green"></i>Compliant farm</span>
+        <span data-filter="atrisk" role="button" tabindex="0" title="Filter map to farms needing verification"><i class="sw sw-hachure-amber"></i>Needs verification</span>
+        <span data-filter="noncompliant" role="button" tabindex="0" title="Filter map to non-compliant (deforestation-flagged) farms"><i class="sw sw-hachure-rust"></i>Non-compliant (deforestation)</span>
+        <span data-filter="station" role="button" tabindex="0" title="Filter map to stations"><i class="sw" style="background:#B8863B;border:1px solid #241A08;"></i>Station</span>
+        <span data-filter="dim" role="button" tabindex="0" title="Toggle items outside the current chain"><i class="sw sw-hachure-dim"></i>Outside current chain</span>
+        <span data-filter="flow" role="button" tabindex="0" title="Zoom to the active chain flow"><i class="sw" style="background:transparent;border-top:2px dashed #8F6626;height:0;"></i>Active flow</span>
+        <button type="button" class="legend-reset" id="legendReset">Reset filter</button>
+      </div>
+    </div>
+
+    <div class="card-box print-hide">
+      <h2>Export batches <span class="hint" id="tableHint"></span></h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-sort="id">Batch<span class="arrow">▾</span></th>
+            <th class="sortable" data-sort="agg">Aggregator<span class="arrow">▾</span></th>
+            <th class="sortable" data-sort="imp">Importer<span class="arrow">▾</span></th>
+            <th class="sortable" data-sort="volume">Vol (MT)<span class="arrow">▾</span></th>
+            <th class="sortable" data-sort="status">EUDR<span class="arrow">▾</span></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="detail" id="detailPanel" aria-live="polite">
+    <div class="detail-head">
+      <h2><span class="detail-type" id="dType">—</span><span id="dTitle">—</span></h2>
+      <button class="btn-clear" id="btnCloseDetail" type="button">Close</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+  <div class="lineage">
+    <h2>Chain of custody</h2>
+    <div class="step" id="stepFarmer"><div class="step-num">1</div><div class="step-lbl">Farmer &amp; farm<small id="lcFarmer">all in scope</small></div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="stepStation"><div class="step-num">2</div><div class="step-lbl">Washing station<small id="lcStation">all in scope</small></div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="stepAggregator"><div class="step-num">3</div><div class="step-lbl">Aggregator / exporter<small id="lcAggregator">all in scope</small></div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="stepBatch"><div class="step-num">4</div><div class="step-lbl">Export batch<small id="lcBatch">all in scope</small></div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="stepImporter"><div class="step-num">5</div><div class="step-lbl">EU importer<small id="lcImporter">all in scope</small></div></div>
+  </div>
+
+  <footer class="print-hide">
+    Data embedded from the NAEB feature-service exports (<code>Importers / Aggregators_Exporters / Stations / Purchases / Sourcing / Deliveries</code>)
+    with illustrative farmer and farm (plot) records added for the prototype. Each record links to the others purely through IDs,
+    so when this page is hosted on the NAEB portal the arrays can be swapped for live <code>queryFeatures()</code> calls unchanged.
+    Farm boundaries on the map are schematic. Selection state is kept in the URL hash, so a traced chain can be shared as a link.
+  </footer>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="report" id="reportWrap" aria-hidden="true">
+  <div class="rep-head">
+    <h1>EUDR Due Diligence Summary</h1>
+    <div class="rep-meta">
+      Report ID <code id="repId">—</code><br>
+      Generated <span id="repDate">—</span><br>
+      Scope: <span id="repScope">—</span>
+    </div>
+  </div>
+  <p class="rep-intro" id="repIntro" style="font-size:11.5px;color:var(--ink-soft);margin:8px 0 0;"></p>
+
+  <div class="rep-section">
+    <h2>1 &nbsp;Commodity &amp; scope</h2>
+    <div class="stats" id="repStats" style="margin:10px 0 4px;"></div>
+  </div>
+
+  <div class="rep-section">
+    <h2>2 &nbsp;Risk assessment &amp; conclusion</h2>
+    <div class="rep-note" id="repEudrNote"></div>
+    <table style="margin-top:10px;">
+      <thead><tr><th>Risk indicator</th><th>Finding</th></tr></thead>
+      <tbody id="reportRisk"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-section">
+    <h2>3 &nbsp;Farmers in scope</h2>
+    <table>
+      <thead><tr><th>Farmer ID</th><th>Name</th><th>Station</th><th>Farms</th><th>EUDR compliance</th><th>Phone</th></tr></thead>
+      <tbody id="reportFarmers"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-section">
+    <h2>4 &nbsp;Plots of production — geolocation</h2>
+    <table>
+      <thead><tr><th>Farm ID</th><th>Farm name</th><th>Owner</th><th>Station</th><th>District</th><th>Latitude</th><th>Longitude</th><th>Area (ha)</th><th>EUDR</th></tr></thead>
+      <tbody id="reportPlots"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-section">
+    <h2>5 &nbsp;Washing stations (aggregation points) in scope</h2>
+    <table>
+      <thead><tr><th>Station</th><th>District</th><th>Aggregator</th><th>Farmers</th><th>Farms</th><th>Coordinates</th></tr></thead>
+      <tbody id="reportStations"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-section">
+    <h2>6 &nbsp;Supply chain operators — aggregators &amp; importers</h2>
+    <table>
+      <thead><tr><th>Role</th><th>Name</th><th>Country</th><th>Licence / EORI</th><th>Contact</th></tr></thead>
+      <tbody id="reportPartners"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-section">
+    <h2>7 &nbsp;Export batches in scope</h2>
+    <table>
+      <thead><tr><th>Batch</th><th>Date</th><th>Aggregator</th><th>Importer</th><th>Container</th><th>Vol (MT)</th><th>EUDR</th></tr></thead>
+      <tbody id="reportBatches"></tbody>
+    </table>
+  </div>
+
+  <div class="rep-foot">
+    <span>Rwanda Coffee Traceability MVP — prototype due diligence summary, illustrative farm/farmer data</span>
+    <span id="repFootRight"></span>
+  </div>
+</div>
+
+<script type="module">
+/* ===========================================================
+   EMBEDDED DATA — NAEB hosted feature-service exports.
+   Source columns: Importers.csv, Aggregators_Exporter.csv,
+   Stations.csv, Purchases.csv, Sourcing.csv, Deliveries.csv.
+   Farmers + farm polygons are illustrative additions for the
+   prototype and keep the same ID-linked structure.
+=========================================================== */
+const FARMERS = [
+  { id:"FARM-0001", name:"Jean Bosco Habimana",  stationKey:"STN-0001", phone:"+250 78 500 1001" },
+  { id:"FARM-0002", name:"Alice Uwase",          stationKey:"STN-0001", phone:"+250 78 500 1002" },
+  { id:"FARM-0003", name:"Emmanuel Nkurunziza",  stationKey:"STN-0002", phone:"+250 78 500 1003" },
+  { id:"FARM-0004", name:"Solange Mukamana",     stationKey:"STN-0002", phone:"+250 78 500 1004" },
+  { id:"FARM-0005", name:"Vincent Habiyaremye",  stationKey:"STN-0003", phone:"+250 78 500 1005" },
+  { id:"FARM-0006", name:"Claudine Ingabire",    stationKey:"STN-0004", phone:"+250 78 500 1006" },
+  { id:"FARM-0007", name:"Eric Nsengimana",      stationKey:"STN-0005", phone:"+250 78 500 1007" },
+  { id:"FARM-0008", name:"Divine Umutoni",       stationKey:"STN-0001", phone:"+250 78 500 1008" },
+  { id:"FARM-0009", name:"Patrick Mugisha",      stationKey:"STN-0003", phone:"+250 78 500 1009" },
+  { id:"FARM-0010", name:"Beatrice Mukamfizi",   stationKey:"STN-0004", phone:"+250 78 500 1010" },
+  { id:"FARM-0011", name:"Dieudonné Karekezi",   stationKey:"STN-0005", phone:"+250 78 500 1011" },
+  { id:"FARM-0012", name:"Yvette Nyirahabimana", stationKey:"STN-0002", phone:"+250 78 500 1012" }
+];
+
+const PLOTS = [
+  { id:"FRM-0101", name:"Gitwe Terrace Farm",     farmerId:"FARM-0001", areaHa:1.6, eudr:"Compliant", center:[-2.443, 29.335] },
+  { id:"FRM-0102", name:"Kibirizi Valley Plot",   farmerId:"FARM-0001", areaHa:0.9, eudr:"Compliant", center:[-2.467, 29.352] },
+  { id:"FRM-0201", name:"Kamabuye Hillside Farm", farmerId:"FARM-0002", areaHa:1.2, eudr:"Compliant", center:[-2.471, 29.365] },
+  { id:"FRM-0202", name:"Nyamirambo Coffee Garden", farmerId:"FARM-0002", areaHa:0.7, eudr:"At risk", center:[-2.449, 29.318] },
+  { id:"FRM-0301", name:"Ruhinga Crest Plot",     farmerId:"FARM-0003", areaHa:1.8, eudr:"Compliant", center:[-1.681, 29.763] },
+  { id:"FRM-0302", name:"Butare Field A",         farmerId:"FARM-0003", areaHa:1.1, eudr:"Compliant", center:[-1.707, 29.789] },
+  { id:"FRM-0401", name:"Kivumu Home Farm",       farmerId:"FARM-0004", areaHa:1.4, eudr:"Compliant", center:[-1.702, 29.748] },
+  { id:"FRM-0402", name:"Base Camp Plot",         farmerId:"FARM-0004", areaHa:0.8, eudr:"Non-compliant", center:[-1.683, 29.802] },
+  { id:"FRM-0501", name:"Maraba Hill Gardens",    farmerId:"FARM-0005", areaHa:2.2, eudr:"Compliant", center:[-2.595, 29.749] },
+  { id:"FRM-0502", name:"Cyendajuru Plot",        farmerId:"FARM-0005", areaHa:1.0, eudr:"Compliant", center:[-2.619, 29.728] },
+  { id:"FRM-0601", name:"Muhura Ridge Farm",      farmerId:"FARM-0006", areaHa:1.5, eudr:"Compliant", center:[-1.628, 30.075] },
+  { id:"FRM-0602", name:"Rugerero Plot",          farmerId:"FARM-0006", areaHa:0.6, eudr:"Compliant", center:[-1.652, 30.096] },
+  { id:"FRM-0701", name:"Gisenyi Lakeside Farm",  farmerId:"FARM-0007", areaHa:1.9, eudr:"Compliant", center:[-1.692, 29.417] },
+  { id:"FRM-0702", name:"Nyundo Highlands Plot",  farmerId:"FARM-0007", areaHa:1.3, eudr:"Compliant", center:[-1.671, 29.444] },
+  { id:"FRM-0801", name:"Kigeli Family Plot",     farmerId:"FARM-0008", areaHa:0.5, eudr:"Compliant", center:[-2.484, 29.341] },
+  { id:"FRM-0802", name:"Kagano Coffee Garden",   farmerId:"FARM-0008", areaHa:0.6, eudr:"Compliant", center:[-2.456, 29.331] },
+  { id:"FRM-0901", name:"Gatare Coffee Gardens",  farmerId:"FARM-0009", areaHa:1.7, eudr:"Compliant", center:[-2.613, 29.757] },
+  { id:"FRM-0902", name:"Karama Slope Plot",      farmerId:"FARM-0009", areaHa:1.2, eudr:"Compliant", center:[-2.589, 29.717] },
+  { id:"FRM-1001", name:"Byumba North Farm",      farmerId:"FARM-0010", areaHa:2.0, eudr:"Compliant", center:[-1.646, 30.067] },
+  { id:"FRM-1002", name:"Rusasa Garden Plot",     farmerId:"FARM-0010", areaHa:0.9, eudr:"Compliant", center:[-1.625, 30.091] },
+  { id:"FRM-1101", name:"Kanyili Coffee Farm",    farmerId:"FARM-0011", areaHa:1.1, eudr:"Compliant", center:[-1.678, 29.458] },
+  { id:"FRM-1102", name:"Bufuka Terrace Plot",    farmerId:"FARM-0011", areaHa:0.8, eudr:"Compliant", center:[-1.694, 29.437] },
+  { id:"FRM-1201", name:"Nduba Family Farm",      farmerId:"FARM-0012", areaHa:1.3, eudr:"Compliant", center:[-1.715, 29.771] },
+  { id:"FRM-1202", name:"Rwankuba Plot",          farmerId:"FARM-0012", areaHa:0.7, eudr:"Compliant", center:[-1.689, 29.758] }
+];
+
+const STATIONS = [
+  { key:"STN-0001", name:"Kibingo Washing Station",  country:"Rwanda", region:"Nyamagabe District", lat:-2.4567, lng:29.3456, aggregatorKey:"AGG-0001", contact:"J. Uwimana", phone:"+250 78 000 0000" },
+  { key:"STN-0002", name:"Musasa Washing Station",   country:"Rwanda", region:"Gakenke District",   lat:-1.6931, lng:29.7739, aggregatorKey:"AGG-0001", contact:"E. Mukamana", phone:"+250 78 222 3344" },
+  { key:"STN-0003", name:"Nyarusiza Washing Station",country:"Rwanda", region:"Huye District",      lat:-2.6073, lng:29.7396, aggregatorKey:"AGG-0002", contact:"P. Nkurunziza", phone:"+250 78 333 5566" },
+  { key:"STN-0004", name:"Gicumbi Coffee Station",   country:"Rwanda", region:"Gicumbi District",   lat:-1.6389, lng:30.0833, aggregatorKey:"AGG-0002", contact:"A. Mugisha", phone:"+250 78 444 7788" },
+  { key:"STN-0005", name:"Rubavu Coffee Washing Station", country:"Rwanda", region:"Rubavu District", lat:-1.6840, lng:29.4300, aggregatorKey:"AGG-0003", contact:"L. Mukandoli", phone:"+250 78 555 8800" }
+];
+
+const AGGREGATORS = [
+  { key:"AGG-0001", name:"Highland Coffee Exporters Ltd",   country:"Rwanda",   license:"EXP-RW-2024-118", contact:"M. Habimana" },
+  { key:"AGG-0002", name:"Rwanda Prime Exports SARL",       country:"Rwanda",   license:"EXP-RW-2024-204", contact:"C. Ndayisenga" },
+  { key:"AGG-0003", name:"Ethiopian Highland Traders PLC",  country:"Ethiopia", license:"EXP-ET-2023-077", contact:"T. Alemu" }
+];
+
+const IMPORTERS = [
+  { code:"IMP-0001", name:"NordCoffee Import GmbH",        country:"Germany",   eori:"DE123456789012345", contact:"H. Weber" },
+  { code:"IMP-0002", name:"Nordic Roasters AB",            country:"Sweden",    eori:"SE556677889901",   contact:"L. Andersson" },
+  { code:"IMP-0003", name:"Amsterdam Coffee Traders B.V.", country:"Netherlands", eori:"NL987654321000", contact:"R. de Vries" }
+];
+
+const PURCHASES = [
+  { id:"PUR-000001", stationKey:"STN-0001", aggregatorKey:"AGG-0001", date:"2026-06-02", weightKg:4200, lot:"LOT-2026-A14" },
+  { id:"PUR-000002", stationKey:"STN-0002", aggregatorKey:"AGG-0001", date:"2026-06-03", weightKg:3800, lot:"LOT-2026-A15" },
+  { id:"PUR-000003", stationKey:"STN-0003", aggregatorKey:"AGG-0002", date:"2026-06-04", weightKg:5100, lot:"LOT-2026-B08" },
+  { id:"PUR-000004", stationKey:"STN-0004", aggregatorKey:"AGG-0002", date:"2026-06-05", weightKg:2600, lot:"LOT-2026-B09" },
+  { id:"PUR-000005", stationKey:"STN-0005", aggregatorKey:"AGG-0003", date:"2026-06-10", weightKg:6200, lot:"LOT-2026-C03" }
+];
+
+const DELIVERIES = [
+  { id:"DLV-000001", farmerId:"FARM-0001", stationKey:"STN-0001", date:"2026-05-14", weightKg:82.5, notes:"", lot:"LOT-2026-A14" },
+  { id:"DLV-000002", farmerId:"FARM-0002", stationKey:"STN-0001", date:"2026-05-15", weightKg:65.0, notes:"", lot:"LOT-2026-A14" },
+  { id:"DLV-000003", farmerId:"FARM-0003", stationKey:"STN-0002", date:"2026-05-16", weightKg:90.2, notes:"", lot:"LOT-2026-A15" },
+  { id:"DLV-000004", farmerId:"FARM-0004", stationKey:"STN-0002", date:"2026-05-16", weightKg:74.8, notes:"", lot:"LOT-2026-A15" },
+  { id:"DLV-000005", farmerId:"FARM-0005", stationKey:"STN-0003", date:"2026-05-18", weightKg:110.0, notes:"", lot:"LOT-2026-B08" },
+  { id:"DLV-000006", farmerId:"FARM-0006", stationKey:"STN-0004", date:"2026-05-19", weightKg:58.3, notes:"Weight recorded on paper slip, no scale ticket — not yet reconciled to a purchase lot", lot:null },
+  { id:"DLV-000007", farmerId:"FARM-0007", stationKey:"STN-0005", date:"2026-05-20", weightKg:95.0, notes:"", lot:"LOT-2026-C03" },
+  { id:"DLV-000008", farmerId:"FARM-0008", stationKey:"STN-0001", date:"2026-05-21", weightKg:70.4, notes:"", lot:"LOT-2026-A14" }
+];
+
+const BATCHES = [
+  { id:"SRC-000001", aggregatorKey:"AGG-0001", importerCode:"IMP-0001", volume:18.0, date:"2026-06-20", containerRef:"CNTR-MSKU-4471852", ddsRef:"", lots:["LOT-2026-A14","LOT-2026-A15"] },
+  { id:"SRC-000002", aggregatorKey:"AGG-0002", importerCode:"IMP-0002", volume:15.5, date:"2026-06-25", containerRef:"CNTR-TCLU-2231190", ddsRef:"", lots:["LOT-2026-B08","LOT-2026-B09"] },
+  { id:"SRC-000003", aggregatorKey:"AGG-0003", importerCode:"IMP-0001", volume:20.0, date:"2026-07-02", containerRef:"CNTR-HLXU-9098231", ddsRef:"", lots:["LOT-2026-C03"] },
+  { id:"SRC-000004", aggregatorKey:"AGG-0001", importerCode:"IMP-0003", volume:12.0, date:"2026-07-05", containerRef:"CNTR-MSCU-5567342", ddsRef:"", lots:["LOT-2026-A15"] }
+];
+
+/* ===========================================================
+   Graph: node registry + adjacency lists (O(1) edge lookups)
+=========================================================== */
+const nodes = new Map();
+const outAdj = new Map();
+const inAdj = new Map();
+
+function addNode(id, type, label, ref){
+  nodes.set(id, { type, label, ref });
+  if(!outAdj.has(id)) outAdj.set(id, new Set());
+  if(!inAdj.has(id)) inAdj.set(id, new Set());
+}
+function addEdge(from, to){
+  if(!outAdj.has(from) || !inAdj.has(to)) return;
+  outAdj.get(from).add(to);
+  inAdj.get(to).add(from);
+}
+
+const stationByKey = new Map(STATIONS.map(s => [s.key, s]));
+const farmerById = new Map(FARMERS.map(f => [f.id, f]));
+const aggByKey = new Map(AGGREGATORS.map(a => [a.key, a]));
+const impByCode = new Map(IMPORTERS.map(i => [i.code, i]));
+
+PLOTS.forEach(p => { p.stationKey = (farmerById.get(p.farmerId) || {}).stationKey || ""; });
+
+/* Phase 1: register every node FIRST. addEdge() below only links nodes that
+   already exist, so all addNode() calls must run before any addEdge() call —
+   otherwise edges to a not-yet-created node (e.g. plot -> station, added
+   while PLOTS is being processed but before STATIONS creates its nodes)
+   are silently dropped and that plot never appears "in scope". */
+FARMERS.forEach(f => addNode(`farmer:${f.id}`, "farmer", f.name, f));
+PLOTS.forEach(p => addNode(`plot:${p.id}`, "plot", p.name, p));
+STATIONS.forEach(s => addNode(`station:${s.key}`, "station", s.name, s));
+AGGREGATORS.forEach(a => addNode(`aggregator:${a.key}`, "aggregator", a.name, a));
+IMPORTERS.forEach(i => addNode(`importer:${i.code}`, "importer", i.name, i));
+BATCHES.forEach(b => addNode(`batch:${b.id}`, "batch", b.id, b));
+DELIVERIES.forEach(d => addNode(`delivery:${d.id}`, "delivery", d.id, d));
+PURCHASES.forEach(p => addNode(`purchase:${p.id}`, "purchase", p.id, p));
+
+/* Phase 2: now that every node exists, wire up all edges. */
+PLOTS.forEach(p => {
+  addEdge(`farmer:${p.farmerId}`, `plot:${p.id}`);
+  addEdge(`plot:${p.id}`, `station:${p.stationKey}`);
+  addEdge(`farmer:${p.farmerId}`, `station:${p.stationKey}`);
+});
+STATIONS.forEach(s => {
+  addEdge(`station:${s.key}`, `aggregator:${s.aggregatorKey}`);
+});
+BATCHES.forEach(b => {
+  addEdge(`aggregator:${b.aggregatorKey}`, `batch:${b.id}`);
+  addEdge(`batch:${b.id}`, `importer:${b.importerCode}`);
+});
+DELIVERIES.forEach(d => {
+  addEdge(`farmer:${d.farmerId}`, `delivery:${d.id}`);
+  addEdge(`delivery:${d.id}`, `station:${d.stationKey}`);
+});
+PURCHASES.forEach(p => {
+  addEdge(`station:${p.stationKey}`, `purchase:${p.id}`);
+  addEdge(`purchase:${p.id}`, `aggregator:${p.aggregatorKey}`);
+});
+/* Precise lot-level linkage: a delivery feeds a purchase lot, and a purchase
+   lot feeds a batch (per BATCHES[i].lots). These are additive edges layered
+   on top of the mass-balance station/aggregator edges above — they let us
+   compute, for any batch, exactly which deliveries/farmers verifiably fed it
+   (see preciseTraceForBatch below), instead of only the aggregator-wide roster. */
+const purchaseByLot = new Map(PURCHASES.map(p => [p.lot, p]));
+DELIVERIES.forEach(d => {
+  if(!d.lot) return;
+  const pur = purchaseByLot.get(d.lot);
+  if(pur) addEdge(`delivery:${d.id}`, `purchase:${pur.id}`);
+});
+BATCHES.forEach(b => {
+  (b.lots || []).forEach(lotCode => {
+    const pur = purchaseByLot.get(lotCode);
+    if(pur) addEdge(`purchase:${pur.id}`, `batch:${b.id}`);
+  });
+});
+
+
+function farmsOfAggregator(aggKey){
+  const stKeys = new Set(STATIONS.filter(s => s.aggregatorKey === aggKey).map(s => s.key));
+  return PLOTS.filter(p => stKeys.has(p.stationKey));
+}
+/* Precise, lot-level trace for a batch: follows batch.lots -> matching
+   purchase -> deliveries actually tagged with that lot -> farmer -> plots.
+   This deliberately ignores the blanket station/aggregator edges, so it
+   only returns farms that are DOCUMENTED contributors to this specific
+   shipment — not every farm that has ever sold to the same station. */
+function preciseTraceForBatch(b){
+  const lotSet = new Set(b.lots || []);
+  const purchases = PURCHASES.filter(p => lotSet.has(p.lot));
+  const deliveries = DELIVERIES.filter(d => d.lot && lotSet.has(d.lot));
+  const farmerIds = new Set(deliveries.map(d => d.farmerId));
+  const farmers = FARMERS.filter(f => farmerIds.has(f.id));
+  const plots = PLOTS.filter(p => farmerIds.has(p.farmerId));
+  // Farms reachable via the mass-balance aggregator roster but NOT confirmed
+  // by a lot-tagged delivery for this batch specifically.
+  const pooledOnlyFarmers = farmsOfAggregator(b.aggregatorKey).length
+    ? FARMERS.filter(f => {
+        const st = stationByKey.get(f.stationKey);
+        return st && st.aggregatorKey === b.aggregatorKey && !farmerIds.has(f.id);
+      })
+    : [];
+  // Deliveries at the right stations, in the right window, that have no lot
+  // reference at all — these are the concrete data-quality gap.
+  const stationKeys = new Set(purchases.map(p => p.stationKey));
+  const unreconciledDeliveries = DELIVERIES.filter(d => !d.lot && stationKeys.has(d.stationKey));
+  return { purchases, deliveries, farmers, plots, pooledOnlyFarmers, unreconciledDeliveries };
+}
+function batchEUDR(b){
+  const farms = farmsOfAggregator(b.aggregatorKey);
+  if(!farms.length) return "Pending";
+  if(farms.some(p => p.eudr === "Non-compliant")) return "Non-compliant";
+  return farms.every(p => p.eudr === "Compliant") ? "Compliant" : "At risk";
+}
+BATCHES.forEach(b => { b.status = batchEUDR(b); b.eudrNote = batchEUDRNote(b); });
+
+function batchEUDRNote(b){
+  const farms = farmsOfAggregator(b.aggregatorKey);
+  const risk = farms.filter(p => p.eudr !== "Compliant");
+  if(!farms.length) return "No farm records upstream — pending verification";
+  if(!risk.length) return `All ${farms.length} upstream plot(s) EUDR compliant`;
+  return `${risk.length} of ${farms.length} upstream plot(s) not yet EUDR compliant`;
+}
+
+function walk(startId, adj){
+  const seen = new Set();
+  const queue = [startId];
+  while(queue.length){
+    const cur = queue.pop();
+    const next = adj.get(cur);
+    if(!next) continue;
+    for(const n of next){
+      if(!seen.has(n)){ seen.add(n); queue.push(n); }
+    }
+  }
+  return seen;
+}
+function ancestors(id){ return walk(id, inAdj); }
+function descendants(id){ return walk(id, outAdj); }
+
+/* Precise chain for a farmer or a single farm (plot): rather than the
+   generic graph walk — which, via the mass-balance station/aggregator
+   edges, would connect a farm to EVERY batch that aggregator ever shipped —
+   this walks the actual documented path: farmer/plot -> station -> the
+   single aggregator -> only the batch(es) whose lots are confirmed, via a
+   lot-tagged delivery, to include this farmer's cherry. This is what
+   "traceability" means for a farm: it stops at the single aggregator, and
+   only lights up the batch(es) it actually contributed to — not every
+   batch the aggregator handled. */
+function preciseFarmerChain(farmerId){
+  const set = new Set();
+  const f = farmerById.get(farmerId);
+  set.add(`farmer:${farmerId}`);
+  if(f && f.stationKey){
+    set.add(`station:${f.stationKey}`);
+    const st = stationByKey.get(f.stationKey);
+    if(st) set.add(`aggregator:${st.aggregatorKey}`);
+  }
+  DELIVERIES.filter(d => d.farmerId === farmerId).forEach(d => {
+    set.add(`delivery:${d.id}`);
+    if(!d.lot) return;
+    const pur = purchaseByLot.get(d.lot);
+    if(pur) set.add(`purchase:${pur.id}`);
+    BATCHES.forEach(b => {
+      if((b.lots || []).includes(d.lot)){
+        set.add(`batch:${b.id}`);
+        set.add(`importer:${b.importerCode}`);
+      }
+    });
+  });
+  return set;
+}
+function connectedSet(id){
+  const n = nodes.get(id);
+  if(n && (n.type === "farmer" || n.type === "plot")){
+    const farmerId = n.type === "farmer" ? n.ref.id : n.ref.farmerId;
+    const set = preciseFarmerChain(farmerId);
+    set.add(id);
+    if(n.type === "farmer"){
+      PLOTS.filter(p => p.farmerId === farmerId).forEach(p => set.add(`plot:${p.id}`));
+    } else {
+      set.add(`plot:${n.ref.id}`);
+    }
+    return set;
+  }
+  return new Set([id, ...ancestors(id), ...descendants(id)]);
+}
+
+/* ===========================================================
+   State
+=========================================================== */
+let selection = null;
+let activeTab = "farmer";
+let connected = null;
+let hoverId = null;
+let searchQuery = "";
+let sortCol = "id";
+let sortDir = "asc";
+
+/* ---- Toast ---- */
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+const filterBar = {
+  importer: document.getElementById("filterImporter"),
+  aggregator: document.getElementById("filterAggregator"),
+  station: document.getElementById("filterStation"),
+  farmer: document.getElementById("filterFarmer")
+};
+
+function setSelection(id, opts = {}){
+  const next = (selection === id && !opts.force) ? null : id;
+  selection = next && nodes.has(next) ? next : null;
+  connected = selection ? connectedSet(selection) : null;
+  if(typeof legendFilter !== "undefined" && legendFilter){
+    legendFilter = null;
+    if(typeof updateLegendUI === "function") updateLegendUI();
+  }
+  syncFiltersFromSelection();
+  renderAll();
+  syncHash();
+}
+
+function syncHash(){
+  const hash = selection ? "#" + encodeURIComponent(selection) : "";
+  if(location.hash !== hash){
+    history.replaceState(null, "", hash || location.pathname + location.search);
+  }
+}
+function selectionFromHash(){
+  const raw = decodeURIComponent(location.hash.replace(/^#/, ""));
+  return nodes.has(raw) ? raw : null;
+}
+
+/* ===========================================================
+   Rendering
+=========================================================== */
+function renderAll(){
+  renderExplorer();
+  renderMap();
+  renderGraph();
+  renderTable();
+  renderPath();
+  renderStats();
+  renderDetail();
+  renderLineage();
+  renderHints();
+  renderReport();
+  if(typeof updateSelectToggleBtn === "function") updateSelectToggleBtn();
+}
+
+const TYPE_ORDER = ["farmer", "plot", "station", "aggregator", "batch", "importer", "delivery", "purchase"];
+const TYPE_LABELS = { farmer:"Farmer", plot:"Farm", station:"Station", aggregator:"Aggregator", batch:"Batch", importer:"Importer", delivery:"Delivery", purchase:"Purchase" };
+
+function eudrBadge(status){
+  if(status === "Compliant") return `<span class="badge badge-compliant">EUDR ✓</span>`;
+  if(status === "Non-compliant") return `<span class="badge badge-noncompliant">Non-compliant</span>`;
+  return `<span class="badge badge-atrisk">At risk</span>`;
+}
+function eudrCounts(plots){
+  const ok = plots.filter(p => p.eudr === "Compliant").length;
+  return { ok, total: plots.length, risk: plots.length - ok };
+}
+
+function itemsForTab(tab){
+  if(tab === "farmer"){
+    return FARMERS.map(f => {
+      const st = stationByKey.get(f.stationKey);
+      const farms = PLOTS.filter(p => p.farmerId === f.id);
+      return { id:`farmer:${f.id}`, name:f.name, meta:`${st ? st.name : f.stationKey} · ${farms.length} farm(s)` };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+  }
+  if(tab === "plot"){
+    return PLOTS.map(p => {
+      const f = farmerById.get(p.farmerId);
+      return { id:`plot:${p.id}`, name:p.name, meta:`${f ? f.name : p.farmerId} · ${p.areaHa} ha · ${eudrBadge(p.eudr)}` };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+  }
+  if(tab === "station"){
+    return STATIONS.map(s => {
+      const ag = aggByKey.get(s.aggregatorKey);
+      const farms = PLOTS.filter(p => p.stationKey === s.key).length;
+      const farmers = FARMERS.filter(f => f.stationKey === s.key).length;
+      return { id:`station:${s.key}`, name:s.name, meta:`${s.region} · ${ag ? ag.name : s.aggregatorKey} · ${farmers} farmer(s), ${farms} farm(s)` };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+  }
+  if(tab === "aggregator"){
+    return AGGREGATORS.map(a => {
+      const stCount = STATIONS.filter(s => s.aggregatorKey === a.key).length;
+      const batchCount = BATCHES.filter(b => b.aggregatorKey === a.key).length;
+      const farms = farmsOfAggregator(a.key);
+      const b = BATCHES.filter(x => x.aggregatorKey === a.key)[0];
+      return { id:`aggregator:${a.key}`, name:a.name, meta:`${a.country} · ${stCount} station(s), ${batchCount} batch(es) · ${eudrBadge(b ? b.status : "Pending")}` };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+  }
+  if(tab === "recent"){
+    const dlv = DELIVERIES.map(d => {
+      const f = farmerById.get(d.farmerId);
+      const st = stationByKey.get(d.stationKey);
+      return { id:`delivery:${d.id}`, name:d.id, meta:`Cherry delivery · ${f ? f.name : d.farmerId} → ${st ? st.name : d.stationKey} · ${d.date} · ${d.weightKg} kg` };
+    });
+    const pur = PURCHASES.map(p => {
+      const st = stationByKey.get(p.stationKey);
+      const ag = aggByKey.get(p.aggregatorKey);
+      return { id:`purchase:${p.id}`, name:p.id, meta:`Lot sale · ${st ? st.name : p.stationKey} → ${ag ? ag.name : p.aggregatorKey} · ${p.date} · ${p.weightKg} kg` };
+    });
+    return dlv.concat(pur).sort((a,b) => b.name.localeCompare(a.name));
+  }
+  return IMPORTERS.map(i => {
+    const batchCount = BATCHES.filter(b => b.importerCode === i.code).length;
+    return { id:`importer:${i.code}`, name:i.name, meta:`${i.country} · ${batchCount} batch(es)` };
+  }).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => {
+      t.classList.remove("active");
+      t.setAttribute("aria-selected", "false");
+    });
+    tab.classList.add("active");
+    tab.setAttribute("aria-selected", "true");
+    activeTab = tab.dataset.tab;
+    searchQuery = "";
+    searchInput.value = "";
+    document.getElementById("clearSearch").classList.remove("show");
+    renderExplorer();
+  });
+});
+
+const searchInput = document.getElementById("explorerSearch");
+const clearSearchBtn = document.getElementById("clearSearch");
+searchInput.addEventListener("input", () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  clearSearchBtn.classList.toggle("show", !!searchQuery);
+  renderExplorer();
+});
+clearSearchBtn.addEventListener("click", () => {
+  searchQuery = "";
+  searchInput.value = "";
+  clearSearchBtn.classList.remove("show");
+  searchInput.focus();
+  renderExplorer();
+});
+function highlightMatch(text){
+  if(!searchQuery) return escapeHtml(text);
+  const s = String(text);
+  const idx = s.toLowerCase().indexOf(searchQuery);
+  if(idx === -1) return escapeHtml(text);
+  return escapeHtml(s.slice(0, idx)) + "<mark>" + escapeHtml(s.slice(idx, idx + searchQuery.length)) + "</mark>" + escapeHtml(s.slice(idx + searchQuery.length));
+}
+
+document.getElementById("cntFarmer").textContent = FARMERS.length;
+document.getElementById("cntPlot").textContent = PLOTS.length;
+document.getElementById("cntStation").textContent = STATIONS.length;
+document.getElementById("cntAggregator").textContent = AGGREGATORS.length;
+document.getElementById("cntImporter").textContent = IMPORTERS.length;
+document.getElementById("cntRecent").textContent = DELIVERIES.length + PURCHASES.length;
+
+function renderExplorer(){
+  const list = document.getElementById("explorerList");
+  list.className = "explorer-list" + (selection ? "" : " no-selection");
+  list.innerHTML = "";
+  const items = itemsForTab(activeTab);
+  // Selecting an entity no longer hides everything else in the list — it
+  // stays fully populated; items in the current chain are just highlighted
+  // (li.in-network / li.active below), everything else quietly dims.
+  let shown = items;
+  if(searchQuery) shown = shown.filter(i => i.name.toLowerCase().includes(searchQuery));
+  if(connected){
+    shown = shown.slice().sort((a, b) => {
+      const aIn = connected.has(a.id) ? 0 : 1;
+      const bIn = connected.has(b.id) ? 0 : 1;
+      return aIn - bIn;
+    });
+  }
+  if(!shown.length){
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.innerHTML = `<span class="name">No ${TYPE_LABELS[activeTab]} match "${escapeHtml(searchQuery)}"</span><span class="meta">Try a different search or clear it</span>`;
+    list.appendChild(li);
+    return;
+  }
+  shown.forEach(item => {
+    const li = document.createElement("li");
+    li.tabIndex = 0;
+    li.setAttribute("role", "option");
+    li.setAttribute("aria-selected", selection === item.id ? "true" : "false");
+    if(selection === item.id) li.classList.add("active");
+    else if(connected && connected.has(item.id)) li.classList.add("in-network");
+    li.innerHTML = `<span class="name">${highlightMatch(item.name)}</span><span class="meta">${item.meta}</span>`;
+    li.addEventListener("click", () => setSelection(item.id));
+    li.addEventListener("keydown", e => {
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); setSelection(item.id); }
+      else if(e.key === "ArrowDown"){ e.preventDefault(); focusSibling(li, 1); }
+      else if(e.key === "ArrowUp"){ e.preventDefault(); focusSibling(li, -1); }
+    });
+    li.addEventListener("mouseenter", () => { hoverId = item.id; refreshHighlightStyles(); });
+    li.addEventListener("mouseleave", () => { hoverId = null; refreshHighlightStyles(); });
+    list.appendChild(li);
+  });
+}
+function focusSibling(li, dir){
+  const items = [...li.parentElement.querySelectorAll("li[tabindex]")];
+  const i = items.indexOf(li);
+  const next = items[i + dir];
+  if(next) next.focus();
+}
+
+/* ---- Map ---- */
+const DEFAULT_CENTER = [-1.95, 29.9];
+const DEFAULT_ZOOM = 8;
+
+/* The whole Leaflet setup below depends on the Leaflet library having
+   loaded from its CDN. That's an external network request — if it's
+   blocked, slow, or fails for any reason, `L` is undefined and the very
+   first line here (`L.map(...)`) throws. Since this used to be a bare
+   top-level statement, that single failure silently killed every line of
+   script AFTER it too — including the final renderAll() call at the
+   bottom of the file — which is why stats, tables and the report could
+   all go blank together even though none of that logic is actually
+   related to maps. Wrapping it in try/catch means a map/CDN failure only
+   disables the Map view; everything else (stats, graph, explorer, CSV,
+   report) keeps working. */
+let mapAvailable = true;
+let map, baseSatellite, baseStreets, baseTerrain, boundariesLayer, svgRenderer, SVG_NS = "http://www.w3.org/2000/svg";
+let plotLayers = {}, stationLayers = {}, chainLine = null, plotsGroup, stationsGroup;
+let mapCardEl, isMapFullscreen = false, FullscreenControl;
+
+/* These have no Leaflet dependency, so they're declared and defined before
+   the try block below — the block references them while building plot
+   polygons, and as plain functions/consts they must exist by then (const
+   values are NOT hoisted the way function declarations are). */
+function hachurePattern(id, lineColor, bgColor){
+  const pattern = document.createElementNS(SVG_NS, "pattern");
+  pattern.setAttribute("id", id);
+  pattern.setAttribute("width", "6");
+  pattern.setAttribute("height", "6");
+  pattern.setAttribute("patternUnits", "userSpaceOnUse");
+  pattern.setAttribute("patternTransform", "rotate(45)");
+  const rect = document.createElementNS(SVG_NS, "rect");
+  rect.setAttribute("width", "6"); rect.setAttribute("height", "6");
+  rect.setAttribute("fill", bgColor);
+  pattern.appendChild(rect);
+  const line = document.createElementNS(SVG_NS, "line");
+  line.setAttribute("x1", "0"); line.setAttribute("y1", "0");
+  line.setAttribute("x2", "0"); line.setAttribute("y2", "6");
+  line.setAttribute("stroke", lineColor);
+  line.setAttribute("stroke-width", "2.2");
+  pattern.appendChild(line);
+  return pattern;
+}
+const PLOT_BORDER = "#F7CF3B";
+const PLOT_BORDER_ACTIVE = "#FFE580";
+const PLOT_BORDER_DIM = "#c9c3ae";
+function plotFill(p){
+  if(p.eudr === "Compliant") return "url(#hachureCompliant)";
+  if(p.eudr === "Non-compliant") return "url(#hachureRisk)";
+  return "url(#hachureAtRisk)";
+}
+function plotPolygon(p){
+  const half = 0.0009 + p.areaHa * 0.0009;
+  const [lat, lng] = p.center;
+  return [[lat-half,lng-half*1.15],[lat-half,lng+half*1.15],[lat+half,lng+half*1.15],[lat+half,lng-half*1.15]];
+}
+
+try {
+  if(typeof L === "undefined") throw new Error("Leaflet (L) did not load — likely blocked or offline.");
+
+  map = L.map("map", { scrollWheelZoom:false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+  /* Basemaps (selectable) */
+  baseSatellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, GIS User Community",
+    maxZoom: 18
+  });
+  baseStreets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19
+  });
+  baseTerrain = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    maxZoom: 18
+  });
+  baseSatellite.addTo(map);
+
+  /* Overlay: reference boundaries/labels, on by default */
+  boundariesLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri", maxZoom: 18
+  });
+  boundariesLayer.addTo(map);
+
+  /* Force the SVG renderer so we can hand-roll hachure fill patterns
+     (satellite imagery underneath makes a flat 0.4-opacity fill hard to
+     read, so plots are outlined in yellow and filled with a diagonal
+     hachure instead of a solid tint). */
+  svgRenderer = L.svg({ padding: 1 }).addTo(map);
+  const svgDefs = document.createElementNS(SVG_NS, "defs");
+  svgDefs.appendChild(hachurePattern("hachureCompliant", "#2F4B3C", "rgba(47,75,60,0.14)"));
+  svgDefs.appendChild(hachurePattern("hachureAtRisk", "#C99A3A", "rgba(201,154,58,0.18)"));
+  svgDefs.appendChild(hachurePattern("hachureRisk", "#A23E2C", "rgba(162,62,44,0.16)"));
+  svgDefs.appendChild(hachurePattern("hachureDim", "#8f897a", "rgba(140,135,120,0.10)"));
+  svgRenderer._container.insertBefore(svgDefs, svgRenderer._container.firstChild);
+
+  plotsGroup = L.layerGroup().addTo(map);
+  stationsGroup = L.layerGroup().addTo(map);
+
+  PLOTS.forEach(p => {
+    const farmer = farmerById.get(p.farmerId);
+    const poly = L.polygon(plotPolygon(p), {
+      renderer: svgRenderer,
+      color: PLOT_BORDER, weight:2, opacity:1,
+      fillColor: plotFill(p), fillOpacity:1
+    }).addTo(plotsGroup);
+    poly.bindPopup(`<strong>${p.name}</strong><br>${farmer ? farmer.name : p.farmerId} · ${p.areaHa} ha<br>${eudrBadge(p.eudr)}`);
+    poly.on("click", e => { L.DomEvent.stop(e); setSelection(`plot:${p.id}`, { force:true }); });
+    plotLayers[p.id] = poly;
+  });
+
+  STATIONS.forEach(s => {
+    const marker = L.circleMarker([s.lat, s.lng], { radius:10, weight:2, color:"#1B2B20", fillColor:"#B8863B", fillOpacity:0.9 })
+      .addTo(stationsGroup)
+      .bindTooltip(s.name, { direction:"top", offset:[0,-8], opacity:0.9 });
+    marker.on("click", e => { L.DomEvent.stop(e); setSelection(`station:${s.key}`, { force:true }); });
+    stationLayers[s.key] = marker;
+  });
+
+  /* ---- Layer control: basemaps + overlays ---- */
+  L.control.layers(
+    { "Satellite imagery": baseSatellite, "Streets": baseStreets, "Topographic": baseTerrain },
+    { "Reference labels": boundariesLayer, "Farm plots": plotsGroup, "Collection stations": stationsGroup },
+    { collapsed:true, position:"topright" }
+  ).addTo(map);
+
+  /* ---- Full-page map control ---- */
+  FullscreenControl = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd: function(){
+      const container = L.DomUtil.create("div", "leaflet-bar");
+      const btn = L.DomUtil.create("a", "map-tool-btn fullscreen-toggle-btn", container);
+      btn.href = "#";
+      btn.innerHTML = "⤢";
+      btn.title = "Open full-page map";
+      btn.setAttribute("role", "button");
+      btn.setAttribute("aria-label", "Open full-page map");
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.on(btn, "click", e => {
+        L.DomEvent.preventDefault(e);
+        setMapFullscreen(!isMapFullscreen);
+      });
+      return container;
+    }
+  });
+  map.addControl(new FullscreenControl());
+} catch(mapInitErr){
+  mapAvailable = false;
+  console.error("Map view disabled — Leaflet failed to initialize:", mapInitErr);
+}
+
+mapCardEl = document.getElementById("mapCard");
+function setMapFullscreen(on){
+  isMapFullscreen = on;
+  mapCardEl.classList.toggle("map-fullscreen", on);
+  document.body.classList.toggle("map-fullscreen-active", on);
+  document.querySelectorAll(".fullscreen-toggle-btn").forEach(btn => {
+    const kind = btn.id === "graphFullscreenBtn" ? "graph" : "map";
+    btn.innerHTML = on ? "⤡" : "⤢";
+    btn.title = on ? `Exit full-page ${kind}` : `Open full-page ${kind}`;
+  });
+  if(mapAvailable) setTimeout(() => map.invalidateSize(), 60);
+}
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && isMapFullscreen) setMapFullscreen(false);
+});
+
+if(!mapAvailable){
+  // Map view can't work without Leaflet — keep the app on Graph view (the
+  // default) and let people know why, instead of leaving a dead tab.
+  const mapTab = document.getElementById("viewTabMap");
+  if(mapTab){
+    mapTab.disabled = true;
+    mapTab.title = "Map view unavailable — the mapping library failed to load (check your connection)";
+    mapTab.style.opacity = "0.4";
+    mapTab.style.cursor = "not-allowed";
+  }
+}
+
+/* ---- Interactive legend: filter + zoom ---- */
+let legendFilter = null; // null | "compliant" | "atrisk" | "station" | "dim" | "flow"
+function legendMatch(kind, id, isPlot){
+  if(kind === "compliant"){
+    if(!isPlot) return false;
+    const p = PLOTS.find(pp => `plot:${pp.id}` === id);
+    return !!p && p.eudr === "Compliant";
+  }
+  if(kind === "atrisk"){
+    if(!isPlot) return false;
+    const p = PLOTS.find(pp => `plot:${pp.id}` === id);
+    return !!p && p.eudr === "At risk";
+  }
+  if(kind === "noncompliant"){
+    if(!isPlot) return false;
+    const p = PLOTS.find(pp => `plot:${pp.id}` === id);
+    return !!p && p.eudr === "Non-compliant";
+  }
+  if(kind === "station") return !isPlot;
+  return true;
+}
+function updateLegendUI(){
+  document.querySelectorAll("#mapLegend span[data-filter]").forEach(el => {
+    el.classList.toggle("legend-active", el.dataset.filter === legendFilter);
+  });
+  document.getElementById("legendReset").classList.toggle("show", !!legendFilter);
+}
+function applyLegendFilter(kind){
+  if(!mapAvailable) return;
+  if(kind === "flow"){
+    if(chainLine){
+      map.flyToBounds(chainLine.getBounds().pad(0.3), { duration:0.6, maxZoom:14 });
+    } else {
+      showToast("No active chain flow selected yet — click a station or farm to trace one.");
+    }
+    return;
+  }
+  if(kind === "dim" && !connected && legendFilter !== "dim"){
+    showToast("No active chain selected — click a station or farm first to isolate its chain.");
+    return;
+  }
+
+  legendFilter = (legendFilter === kind) ? null : kind;
+  updateLegendUI();
+  applyMapStyles();
+
+  if(!legendFilter){
+    renderMap();
+    return;
+  }
+
+  const pts = [];
+  if(legendFilter === "dim"){
+    PLOTS.forEach(p => { if(connected.has(`plot:${p.id}`)) pts.push(p.center); });
+    STATIONS.forEach(s => { if(connected.has(`station:${s.key}`)) pts.push([s.lat, s.lng]); });
+  } else {
+    PLOTS.forEach(p => { if(legendMatch(legendFilter, `plot:${p.id}`, true)) pts.push(p.center); });
+    STATIONS.forEach(s => { if(legendMatch(legendFilter, `station:${s.key}`, false)) pts.push([s.lat, s.lng]); });
+  }
+  if(pts.length){
+    map.flyToBounds(L.latLngBounds(pts).pad(0.4), { duration:0.6, maxZoom:14 });
+  }
+}
+document.querySelectorAll("#mapLegend span[data-filter]").forEach(el => {
+  el.addEventListener("click", () => applyLegendFilter(el.dataset.filter));
+  el.addEventListener("keydown", e => {
+    if(e.key === "Enter" || e.key === " "){ e.preventDefault(); applyLegendFilter(el.dataset.filter); }
+  });
+});
+document.getElementById("legendReset").addEventListener("click", () => {
+  legendFilter = null;
+  updateLegendUI();
+  renderMap();
+});
+
+function nodeIsDimmed(id){
+  if(!connected) return false;
+  if(hoverId){
+    const hoverSet = connectedSet(hoverId);
+    if(hoverSet.has(id) || id === hoverId) return false;
+    return true;
+  }
+  return !connected.has(id);
+}
+
+function applyMapStyles(){
+  if(!mapAvailable) return;
+  PLOTS.forEach(p => {
+    const id = `plot:${p.id}`;
+    let dimmed = nodeIsDimmed(id);
+    const isActive = selection === id;
+    const isHover = hoverId === id;
+    let hidden = false;
+    if(legendFilter && legendFilter !== "dim" && !legendMatch(legendFilter, id, true)) dimmed = true;
+    if(legendFilter === "dim" && connected && !connected.has(id)) hidden = true;
+    plotLayers[p.id].setStyle({
+      fillColor: dimmed ? "url(#hachureDim)" : plotFill(p),
+      fillOpacity: hidden ? 0 : 1,
+      color: isActive ? PLOT_BORDER_ACTIVE : (dimmed ? PLOT_BORDER_DIM : PLOT_BORDER),
+      opacity: hidden ? 0 : (dimmed ? 0.45 : 1),
+      weight: isActive ? 3.5 : (isHover ? 3 : 2)
+    });
+    /* Non-compliant / needs-verification farms pulse in the current scope so
+       they stand out, whatever selection or legend filter is applied. */
+    const plotEl = plotLayers[p.id].getElement ? plotLayers[p.id].getElement() : plotLayers[p.id]._path;
+    if(plotEl){
+      plotEl.classList.remove("plot-pulse-atrisk", "plot-pulse-noncompliant");
+      if(!hidden && p.eudr !== "Compliant"){
+        plotEl.classList.add(p.eudr === "Non-compliant" ? "plot-pulse-noncompliant" : "plot-pulse-atrisk");
+      }
+    }
+  });
+  STATIONS.forEach(s => {
+    const id = `station:${s.key}`;
+    let dimmed = nodeIsDimmed(id);
+    const isActive = selection === id;
+    let hidden = false;
+    if(legendFilter && legendFilter !== "dim" && !legendMatch(legendFilter, id, false)) dimmed = true;
+    if(legendFilter === "dim" && connected && !connected.has(id)) hidden = true;
+    stationLayers[s.key].setStyle({
+      fillOpacity: hidden ? 0 : (dimmed ? 0.08 : 0.9),
+      opacity: hidden ? 0 : (dimmed ? 0.15 : 1),
+      radius: isActive ? 13 : 10,
+      color: isActive ? "#8F6626" : "#1B2B20",
+      weight: isActive ? 3 : 2
+    });
+  });
+}
+
+function renderMap(){
+  if(!mapAvailable) return;
+  applyMapStyles();
+
+  if(chainLine){ map.removeLayer(chainLine); chainLine = null; }
+
+  if(!connected){
+    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { animate:true, duration:0.6 });
+    return;
+  }
+
+  const chainStations = STATIONS.filter(s => connected.has(`station:${s.key}`));
+  if(chainStations.length > 1){
+    chainLine = L.polyline(
+      chainStations.map(s => [s.lat, s.lng]),
+      { color:"#8F6626", weight:2.5, dashArray:"7 5", opacity:0.85 }
+    ).addTo(map);
+  }
+
+  /* Selecting any feature MUST force the map to zoom to every farm and
+     station connected to it — build bounds from the actual farm shapes
+     (not just their centers) plus every related station, then fly there
+     unconditionally so the full chain is always framed. */
+  const bounds = L.latLngBounds([]);
+  PLOTS.forEach(p => { if(connected.has(`plot:${p.id}`)) bounds.extend(plotLayers[p.id].getBounds()); });
+  STATIONS.forEach(s => { if(connected.has(`station:${s.key}`)) bounds.extend([s.lat, s.lng]); });
+
+  if(bounds.isValid()){
+    map.flyToBounds(bounds.pad(0.5), { animate:true, duration:0.6, maxZoom:15 });
+  }
+}
+
+/* ===========================================================
+   Knowledge graph view — node-link diagram of the same graph
+   (nodes / outAdj) that drives the map and explorer, laid out
+   in layers (farmer → farm → station → aggregator → batch →
+   importer) and force-relaxed within each layer. Nodes are
+   draggable; the canvas pans and zooms; clicking or hovering a
+   node drives the exact same setSelection()/hoverId state as
+   the map and list, so all views always agree.
+=========================================================== */
+const GRAPH_LAYERS = { farmer:0, plot:1, station:2, aggregator:3, batch:4, importer:5 };
+const NODE_R = { farmer:5.5, plot:6.5, station:8, aggregator:9, batch:7.5, importer:9.5 };
+const VBW = 900, VBH = 440;
+
+const graphNodes = [];
+const graphNodeIndex = new Map();
+for(const [id, n] of nodes){
+  if(!(n.type in GRAPH_LAYERS)) continue;
+  const gn = { id, type:n.type, label:n.label, ref:n.ref, layer:GRAPH_LAYERS[n.type], x:0, y:0, vy:0, fixed:false };
+  graphNodes.push(gn);
+  graphNodeIndex.set(id, gn);
+}
+const graphEdges = [];
+graphNodes.forEach(gn => {
+  const outs = outAdj.get(gn.id);
+  if(!outs) return;
+  outs.forEach(to => {
+    const tn = graphNodeIndex.get(to);
+    if(tn && tn.layer === gn.layer + 1) graphEdges.push({ from:gn.id, to });
+  });
+});
+
+function nodeColor(gn){
+  if(gn.type === "plot"){
+    if(gn.ref.eudr === "Compliant") return "#4B5A50";
+    if(gn.ref.eudr === "Non-compliant") return "#8C4A3E";
+    return "#B08F55";
+  }
+  if(gn.type === "batch"){
+    if(gn.ref.status === "Compliant") return "#4B5A50";
+    if(gn.ref.status === "Non-compliant") return "#8C4A3E";
+    if(gn.ref.status === "At risk") return "#B08F55";
+    return "#7A6A45";
+  }
+  if(gn.type === "farmer") return "#6B6459";
+  if(gn.type === "station") return "#B8863B";
+  if(gn.type === "aggregator") return "#7A6A45";
+  if(gn.type === "importer") return "#2A2620";
+  return "#8f897a";
+}
+
+function assignInitialPositions(){
+  const groups = [[],[],[],[],[],[]];
+  graphNodes.forEach(gn => groups[gn.layer].push(gn));
+  groups.forEach((grp, li) => {
+    const x = 70 + li * (VBW - 140) / 5;
+    const spread = VBH - 60;
+    grp.forEach((gn, idx) => {
+      gn.x = x;
+      gn.y = grp.length <= 1 ? VBH / 2 : 30 + idx * spread / (grp.length - 1);
+      gn.vy = 0;
+    });
+  });
+}
+function layoutForces(){
+  for(let it = 0; it < 140; it++){
+    for(let i = 0; i < graphNodes.length; i++){
+      const a = graphNodes[i];
+      if(a.fixed) continue;
+      let fy = 0;
+      for(let j = 0; j < graphNodes.length; j++){
+        if(i === j) continue;
+        const b = graphNodes[j];
+        const dy = a.y - b.y, dx = a.x - b.x;
+        const distSq = dx * dx + dy * dy + 0.02;
+        if(distSq > 9000) continue;
+        const strength = a.layer === b.layer ? 850 : 90;
+        fy += strength * dy / distSq;
+      }
+      a.vy = (a.vy + fy * 0.02) * 0.6;
+    }
+    graphEdges.forEach(e => {
+      const a = graphNodeIndex.get(e.from), b = graphNodeIndex.get(e.to);
+      const pull = (b.y - a.y) * 0.018;
+      if(!a.fixed) a.vy += pull;
+      if(!b.fixed) b.vy -= pull;
+    });
+    graphNodes.forEach(gn => {
+      if(gn.fixed) return;
+      gn.vy *= 0.85;
+      gn.y += gn.vy;
+      gn.y += (VBH / 2 - gn.y) * 0.002;
+      gn.y = Math.max(24, Math.min(VBH - 24, gn.y));
+    });
+  }
+}
+
+const graphSvg = document.getElementById("graphSvg");
+const graphWrapEl = document.getElementById("graphWrap");
+const graphTooltipEl = document.getElementById("graphTooltip");
+graphSvg.setAttribute("viewBox", `0 0 ${VBW} ${VBH}`);
+const graphViewport = document.createElementNS(SVG_NS, "g");
+graphViewport.setAttribute("id", "graphViewport");
+const gEdgesLayer = document.createElementNS(SVG_NS, "g");
+const gNodesLayer = document.createElementNS(SVG_NS, "g");
+graphViewport.appendChild(gEdgesLayer);
+graphViewport.appendChild(gNodesLayer);
+graphSvg.appendChild(graphViewport);
+
+let zoomK = 1, panX = 0, panY = 0;
+function updateViewportTransform(){
+  graphViewport.setAttribute("transform", `translate(${panX},${panY}) scale(${zoomK})`);
+}
+function rootSpacePoint(evt){
+  const pt = graphSvg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const ctm = graphSvg.getScreenCTM();
+  if(!ctm) return { x:0, y:0 };
+  const p = pt.matrixTransform(ctm.inverse());
+  return { x:p.x, y:p.y };
+}
+function toLocal(rp){ return { x:(rp.x - panX) / zoomK, y:(rp.y - panY) / zoomK }; }
+
+function positionNode(gn){ gn.el.setAttribute("transform", `translate(${gn.x},${gn.y})`); }
+function updateEdgePositions(){
+  graphEdges.forEach(e => {
+    const a = graphNodeIndex.get(e.from), b = graphNodeIndex.get(e.to);
+    e.el.setAttribute("x1", a.x); e.el.setAttribute("y1", a.y);
+    e.el.setAttribute("x2", b.x); e.el.setAttribute("y2", b.y);
+  });
+}
+function positionAllGraphNodes(){
+  graphNodes.forEach(positionNode);
+  updateEdgePositions();
+}
+
+function showGraphTooltip(gn){
+  let meta = TYPE_LABELS[gn.type];
+  if(gn.type === "plot") meta += ` · ${gn.ref.areaHa} ha · ${gn.ref.eudr}`;
+  else if(gn.type === "station") meta += ` · ${gn.ref.region}`;
+  else if(gn.type === "aggregator") meta += ` · ${gn.ref.country}`;
+  else if(gn.type === "batch") meta += ` · ${gn.ref.volume} MT · ${gn.ref.status}`;
+  else if(gn.type === "importer") meta += ` · ${gn.ref.country}`;
+  else if(gn.type === "farmer") meta += ` · ${(STATIONS.find(s=>s.key===gn.ref.stationKey)||{}).name || ""}`;
+  graphTooltipEl.innerHTML = `<b>${escapeHtml(gn.label)}</b><span class="gt-meta">${escapeHtml(meta)}</span>`;
+  graphTooltipEl.classList.add("show");
+}
+function hideGraphTooltip(){ graphTooltipEl.classList.remove("show"); }
+function moveGraphTooltip(evt){
+  const rect = graphWrapEl.getBoundingClientRect();
+  graphTooltipEl.style.left = (evt.clientX - rect.left) + "px";
+  graphTooltipEl.style.top = (evt.clientY - rect.top - 12) + "px";
+}
+
+let dragNode = null, dragStartLocal = null, dragStartPos = null, dragMoved = false;
+function onNodeMouseDown(gn, evt){
+  evt.stopPropagation();
+  if(evt.button !== 0) return;
+  dragNode = gn;
+  dragStartLocal = toLocal(rootSpacePoint(evt));
+  dragStartPos = { x:gn.x, y:gn.y };
+  dragMoved = false;
+}
+function onDocMouseMove(evt){
+  if(dragNode){
+    const local = toLocal(rootSpacePoint(evt));
+    const dx = local.x - dragStartLocal.x, dy = local.y - dragStartLocal.y;
+    if(Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved = true;
+    dragNode.x = Math.max(16, Math.min(VBW - 16, dragStartPos.x + dx));
+    dragNode.y = Math.max(16, Math.min(VBH - 16, dragStartPos.y + dy));
+    dragNode.fixed = true;
+    positionNode(dragNode);
+    updateEdgePositions();
+    return;
+  }
+  if(panningGraph){
+    const ctm = graphSvg.getScreenCTM();
+    if(!ctm) return;
+    panX = panStartXY.x + (evt.clientX - panStartClient.x) / ctm.a;
+    panY = panStartXY.y + (evt.clientY - panStartClient.y) / ctm.d;
+    updateViewportTransform();
+  }
+}
+function onDocMouseUp(){
+  if(dragNode && !dragMoved) setSelection(dragNode.id, { force:true });
+  dragNode = null;
+  if(panningGraph){ panningGraph = false; graphWrapEl.classList.remove("panning"); }
+}
+document.addEventListener("mousemove", onDocMouseMove);
+document.addEventListener("mouseup", onDocMouseUp);
+
+let panningGraph = false, panStartClient = null, panStartXY = null;
+graphWrapEl.addEventListener("mousedown", evt => {
+  if(evt.target.closest(".g-node")) return;
+  panningGraph = true;
+  panStartClient = { x:evt.clientX, y:evt.clientY };
+  panStartXY = { x:panX, y:panY };
+  graphWrapEl.classList.add("panning");
+});
+graphWrapEl.addEventListener("wheel", evt => {
+  evt.preventDefault();
+  const rp = rootSpacePoint(evt);
+  const local = toLocal(rp);
+  const newK = Math.max(0.4, Math.min(3.5, zoomK * (evt.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  panX = rp.x - local.x * newK;
+  panY = rp.y - local.y * newK;
+  zoomK = newK;
+  updateViewportTransform();
+}, { passive:false });
+function zoomGraphBy(factor){
+  const anchor = { x:VBW / 2, y:VBH / 2 };
+  const local = toLocal(anchor);
+  const newK = Math.max(0.4, Math.min(3.5, zoomK * factor));
+  panX = anchor.x - local.x * newK;
+  panY = anchor.y - local.y * newK;
+  zoomK = newK;
+  updateViewportTransform();
+}
+document.getElementById("graphZoomIn").addEventListener("click", () => zoomGraphBy(1.25));
+document.getElementById("graphZoomOut").addEventListener("click", () => zoomGraphBy(0.8));
+document.getElementById("graphZoomReset").addEventListener("click", () => { panX = 0; panY = 0; zoomK = 1; updateViewportTransform(); });
+
+document.getElementById("graphFullscreenBtn").addEventListener("click", () => setMapFullscreen(!isMapFullscreen));
+
+/* ---- Select / deselect current chain ---- */
+const graphSelectToggleBtn = document.getElementById("graphSelectToggleBtn");
+function updateSelectToggleBtn(){
+  const has = !!selection;
+  graphSelectToggleBtn.disabled = !has;
+  graphSelectToggleBtn.title = has ? "Deselect (clear chain)" : "Nothing selected";
+  graphSelectToggleBtn.setAttribute("aria-label", graphSelectToggleBtn.title);
+  graphSelectToggleBtn.classList.toggle("active", has);
+}
+graphSelectToggleBtn.addEventListener("click", () => { if(selection) setSelection(null); });
+
+let labelsVisible = true;
+const graphLabelToggleBtn = document.getElementById("graphLabelToggle");
+function setGraphLabels(on){
+  labelsVisible = on;
+  graphWrapEl.classList.toggle("graph-no-labels", !on);
+  graphLabelToggleBtn.classList.toggle("active", on);
+  graphLabelToggleBtn.setAttribute("aria-pressed", String(on));
+  graphLabelToggleBtn.title = on ? "Hide labels" : "Show labels";
+}
+graphLabelToggleBtn.addEventListener("click", () => setGraphLabels(!labelsVisible));
+
+/* Small self-contained glyphs (not a photo of gender/identity — farmers all
+   share one neutral person icon, since the underlying data has no gender
+   field and none is inferred from names). Drawn in a light ink over the
+   existing compliance-coloured dot, so the colour still carries EUDR
+   status/type meaning and the glyph only adds shape recognition. */
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+function appendTypeIcon(g, gn){
+  const r = NODE_R[gn.type];
+  const ink = "#FAF7F2";
+  const icon = svgEl("g", { class:"g-icon" });
+  icon.setAttribute("pointer-events", "none");
+  if(gn.type === "farmer"){
+    icon.appendChild(svgEl("circle", { cx:0, cy:-r*0.34, r:r*0.26, fill:ink }));
+    icon.appendChild(svgEl("path", { d:`M ${-r*0.46} ${r*0.56} Q ${-r*0.46} ${r*0.02} 0 ${r*0.02} Q ${r*0.46} ${r*0.02} ${r*0.46} ${r*0.56} Z`, fill:ink }));
+  } else if(gn.type === "plot"){
+    icon.appendChild(svgEl("path", {
+      d:`M0 ${-r*0.62} C ${r*0.58} ${-r*0.34} ${r*0.5} ${r*0.16} 0 ${r*0.62} C ${-r*0.5} ${r*0.16} ${-r*0.58} ${-r*0.34} 0 ${-r*0.62} Z`,
+      fill:ink
+    }));
+    icon.appendChild(svgEl("line", { x1:0, y1:-r*0.42, x2:0, y2:r*0.4, stroke:nodeColor(gn), "stroke-width":Math.max(0.5, r*0.1) }));
+  } else if(gn.type === "station"){
+    icon.appendChild(svgEl("path", { d:`M ${-r*0.5} ${-r*0.05} L 0 ${-r*0.56} L ${r*0.5} ${-r*0.05} Z`, fill:ink }));
+    icon.appendChild(svgEl("rect", { x:-r*0.38, y:-r*0.05, width:r*0.76, height:r*0.56, fill:ink }));
+  } else if(gn.type === "aggregator"){
+    icon.appendChild(svgEl("path", { d:`M ${-r*0.4} ${-r*0.04} A ${r*0.4} ${r*0.4} 0 0 1 ${r*0.4} ${-r*0.04} Z`, fill:ink }));
+    icon.appendChild(svgEl("rect", { x:-r*0.4, y:-r*0.04, width:r*0.8, height:r*0.6, fill:ink }));
+  } else if(gn.type === "batch"){
+    icon.appendChild(svgEl("rect", { x:-r*0.42, y:-r*0.34, width:r*0.84, height:r*0.68, fill:ink }));
+    icon.appendChild(svgEl("rect", { x:-r*0.42, y:-r*0.09, width:r*0.84, height:r*0.18, fill:nodeColor(gn) }));
+  } else if(gn.type === "importer"){
+    const sw = Math.max(0.6, r*0.14);
+    icon.appendChild(svgEl("circle", { cx:0, cy:-r*0.52, r:r*0.16, fill:"none", stroke:ink, "stroke-width":sw }));
+    icon.appendChild(svgEl("line", { x1:0, y1:-r*0.37, x2:0, y2:r*0.42, stroke:ink, "stroke-width":sw, "stroke-linecap":"round" }));
+    icon.appendChild(svgEl("line", { x1:-r*0.28, y1:-r*0.1, x2:r*0.28, y2:-r*0.1, stroke:ink, "stroke-width":sw, "stroke-linecap":"round" }));
+    icon.appendChild(svgEl("path", { d:`M ${-r*0.4} ${r*0.12} Q ${-r*0.4} ${r*0.42} 0 ${r*0.42}`, fill:"none", stroke:ink, "stroke-width":sw, "stroke-linecap":"round" }));
+    icon.appendChild(svgEl("path", { d:`M ${r*0.4} ${r*0.12} Q ${r*0.4} ${r*0.42} 0 ${r*0.42}`, fill:"none", stroke:ink, "stroke-width":sw, "stroke-linecap":"round" }));
+  }
+  g.appendChild(icon);
+}
+function buildGraphDOM(){
+  graphEdges.forEach(e => {
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("class", "g-edge");
+    gEdgesLayer.appendChild(line);
+    e.el = line;
+  });
+  graphNodes.forEach(gn => {
+    const g = document.createElementNS(SVG_NS, "g");
+    const leaf = gn.type === "farmer" || gn.type === "plot";
+    g.setAttribute("class", "g-node" + (leaf ? " g-leaf" : ""));
+    g.setAttribute("tabindex", "0");
+    g.setAttribute("role", "button");
+    g.setAttribute("aria-label", `${TYPE_LABELS[gn.type]}: ${gn.label}`);
+    const circle = document.createElementNS(SVG_NS, "circle");
+    circle.setAttribute("class", "g-dot");
+    circle.setAttribute("r", NODE_R[gn.type]);
+    circle.setAttribute("fill", nodeColor(gn));
+    g.appendChild(circle);
+    appendTypeIcon(g, gn);
+    {
+      // All node types get a text label, including farmers and farms
+      // (leaf nodes) — smaller font for leaves is handled by .g-leaf text.
+      const maxLen = leaf ? 18 : 24;
+      const text = document.createElementNS(SVG_NS, "text");
+      text.textContent = gn.label.length > maxLen ? gn.label.slice(0, maxLen - 2) + "…" : gn.label;
+      text.setAttribute("x", NODE_R[gn.type] + (leaf ? 4 : 5));
+      text.setAttribute("y", 3);
+      g.appendChild(text);
+    }
+    g.addEventListener("mousedown", evt => onNodeMouseDown(gn, evt));
+    g.addEventListener("mouseenter", () => { hoverId = gn.id; showGraphTooltip(gn); refreshHighlightStyles(); });
+    g.addEventListener("mousemove", moveGraphTooltip);
+    g.addEventListener("mouseleave", () => { hoverId = null; hideGraphTooltip(); refreshHighlightStyles(); });
+    g.addEventListener("keydown", evt => {
+      if(evt.key === "Enter" || evt.key === " "){ evt.preventDefault(); setSelection(gn.id, { force:true }); }
+    });
+    gNodesLayer.appendChild(g);
+    gn.el = g;
+  });
+  positionAllGraphNodes();
+}
+
+let graphLegendFilter = null;
+function graphLegendMatch(kind, gn){
+  if(kind === "compliant") return gn.type === "plot" && gn.ref.eudr === "Compliant";
+  if(kind === "atrisk") return gn.type === "plot" && gn.ref.eudr === "At risk";
+  if(kind === "noncompliant") return gn.type === "plot" && gn.ref.eudr === "Non-compliant";
+  return true;
+}
+document.querySelectorAll("#graphLegend span[data-filter]").forEach(el => {
+  el.addEventListener("click", () => {
+    graphLegendFilter = graphLegendFilter === el.dataset.filter ? null : el.dataset.filter;
+    document.querySelectorAll("#graphLegend span[data-filter]").forEach(s => s.classList.toggle("legend-active", s.dataset.filter === graphLegendFilter));
+    document.getElementById("graphLegendReset").classList.toggle("show", !!graphLegendFilter);
+    applyGraphStyles();
+  });
+  el.addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.click(); } });
+});
+document.getElementById("graphLegendReset").addEventListener("click", () => {
+  graphLegendFilter = null;
+  document.querySelectorAll("#graphLegend span[data-filter]").forEach(s => s.classList.remove("legend-active"));
+  document.getElementById("graphLegendReset").classList.remove("show");
+  applyGraphStyles();
+});
+
+function applyGraphStyles(){
+  graphNodes.forEach(gn => {
+    const dim = nodeIsDimmed(gn.id) || (graphLegendFilter && !graphLegendMatch(graphLegendFilter, gn));
+    gn.el.classList.toggle("g-dim", !!dim);
+    gn.el.classList.toggle("g-active", selection === gn.id);
+  });
+  graphEdges.forEach(e => {
+    const bothVisible = !nodeIsDimmed(e.from) && !nodeIsDimmed(e.to);
+    e.el.classList.toggle("g-edge-active", !!(connected && connected.has(e.from) && connected.has(e.to) && bothVisible));
+    e.el.classList.toggle("g-edge-dim", connected ? !bothVisible : false);
+  });
+}
+function flyToConnected(){
+  const set = connected || new Set(graphNodes.map(n => n.id));
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, count = 0;
+  graphNodes.forEach(gn => {
+    if(!set.has(gn.id)) return;
+    minX = Math.min(minX, gn.x); maxX = Math.max(maxX, gn.x);
+    minY = Math.min(minY, gn.y); maxY = Math.max(maxY, gn.y);
+    count++;
+  });
+  if(!count) return;
+  minX -= 55; maxX += 55; minY -= 45; maxY += 45;
+  const w = Math.max(maxX - minX, 80), h = Math.max(maxY - minY, 80);
+  const scale = Math.max(0.5, Math.min(2.4, Math.min(VBW / w, VBH / h)));
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  graphViewport.classList.add("g-animate");
+  zoomK = scale;
+  panX = VBW / 2 - cx * scale;
+  panY = VBH / 2 - cy * scale;
+  updateViewportTransform();
+  setTimeout(() => graphViewport.classList.remove("g-animate"), 620);
+}
+function renderGraph(){
+  applyGraphStyles();
+  flyToConnected();
+}
+function refreshHighlightStyles(){
+  applyMapStyles();
+  applyGraphStyles();
+}
+
+assignInitialPositions();
+layoutForces();
+buildGraphDOM();
+updateViewportTransform();
+applyGraphStyles();
+
+/* ---- View toggle: Graph (default) vs Map ---- */
+let activeView = "map";
+const viewTabGraph = document.getElementById("viewTabGraph");
+const viewTabMap = document.getElementById("viewTabMap");
+const mapEl = document.getElementById("map");
+const mapLegendEl = document.getElementById("mapLegend");
+const graphLegendEl = document.getElementById("graphLegend");
+function setView(view){
+  activeView = view;
+  viewTabGraph.classList.toggle("active", view === "graph");
+  viewTabGraph.setAttribute("aria-selected", String(view === "graph"));
+  viewTabMap.classList.toggle("active", view === "map");
+  viewTabMap.setAttribute("aria-selected", String(view === "map"));
+  graphWrapEl.style.display = view === "graph" ? "block" : "none";
+  mapEl.style.display = view === "map" ? "block" : "none";
+  graphLegendEl.style.display = view === "graph" ? "flex" : "none";
+  mapLegendEl.style.display = view === "map" ? "flex" : "none";
+  if(view === "map" && mapAvailable) setTimeout(() => { map.invalidateSize(); renderMap(); }, 30);
+}
+viewTabGraph.addEventListener("click", () => setView("graph"));
+viewTabMap.addEventListener("click", () => setView("map"));
+
+/* ---- Batch table ---- */
+const SORT_KEYS = {
+  id: b => b.id,
+  agg: b => (aggByKey.get(b.aggregatorKey) || {}).name || b.aggregatorKey,
+  imp: b => (impByCode.get(b.importerCode) || {}).name || b.importerCode,
+  volume: b => b.volume,
+  status: b => b.status
+};
+document.querySelectorAll("th.sortable").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if(sortCol === col) sortDir = sortDir === "asc" ? "desc" : "asc";
+    else { sortCol = col; sortDir = "asc"; }
+    renderTable();
+  });
+});
+function updateSortHeaders(){
+  document.querySelectorAll("th.sortable").forEach(th => {
+    const active = th.dataset.sort === sortCol;
+    th.classList.toggle("sorted", active);
+    th.querySelector(".arrow").textContent = active ? (sortDir === "asc" ? "▲" : "▼") : "▾";
+  });
+}
+function renderTable(){
+  updateSortHeaders();
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  const hasSel = !!connected;
+  const keyFn = SORT_KEYS[sortCol] || SORT_KEYS.id;
+  const dirMul = sortDir === "asc" ? 1 : -1;
+  const sorted = [...BATCHES]
+    .filter(b => !hasSel || connected.has(`batch:${b.id}`))
+    .sort((a,b) => {
+      const av = keyFn(a), bv = keyFn(b);
+      if(typeof av === "number" && typeof bv === "number") return (av - bv) * dirMul;
+      return String(av).localeCompare(String(bv)) * dirMul;
+    });
+  sorted.forEach(b => {
+    const id = `batch:${b.id}`;
+    const isActive = selection === id;
+    const agg = aggByKey.get(b.aggregatorKey);
+    const imp = impByCode.get(b.importerCode);
+    const tr = document.createElement("tr");
+    tr.tabIndex = 0;
+    tr.className = hasSel ? (isActive ? "active" : "in-network") : "no-selection";
+    tr.innerHTML = `
+      <td class="batch-id">${b.id}</td>
+      <td>${agg ? escapeHtml(agg.name) : b.aggregatorKey}</td>
+      <td>${imp ? escapeHtml(imp.name) : b.importerCode}<br><span style="color:var(--ink-soft);font-size:10.5px;">${b.importerCode}</span></td>
+      <td>${b.volume.toFixed(1)}</td>
+      <td>${eudrBadge(b.status)}</td>
+    `;
+    tr.addEventListener("click", () => setSelection(id));
+    tr.addEventListener("keydown", e => {
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); setSelection(id); }
+    });
+    tr.addEventListener("mouseenter", () => { hoverId = id; refreshHighlightStyles(); });
+    tr.addEventListener("mouseleave", () => { hoverId = null; refreshHighlightStyles(); });
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---- Breadcrumb path ---- */
+function renderPath(){
+  const el = document.getElementById("pathText");
+  if(!selection){
+    el.innerHTML = "Pick an importer to trace its chain downstream — through batches, aggregators and stations — down to each farmer's farm. EUDR status is tracked per plot.";
+    return;
+  }
+  const groups = Object.fromEntries(TYPE_ORDER.map(t => [t, []]));
+  connected.forEach(id => {
+    const n = nodes.get(id);
+    if(n && groups[n.type]) groups[n.type].push(n.label);
+  });
+  const parts = TYPE_ORDER
+    .filter(t => groups[t].length)
+    .map(t => `<span class="chip">${TYPE_LABELS[t]}</span>${groups[t].map(escapeHtml).join(", ")}`);
+  el.innerHTML = "<b>Linked chain:</b> " + parts.join("  ");
+}
+
+/* ---- Stats ---- */
+function renderStats(){
+  const set = connected || new Set(nodes.keys());
+  let farmers = 0, plots = 0, area = 0, stations = 0, volume = 0, batchCount = 0, eudrOk = 0;
+
+  FARMERS.forEach(f => { if(set.has(`farmer:${f.id}`)) farmers++; });
+  PLOTS.forEach(p => {
+    if(set.has(`plot:${p.id}`)){ plots++; area += p.areaHa; if(p.eudr === "Compliant") eudrOk++; }
+  });
+  STATIONS.forEach(s => { if(set.has(`station:${s.key}`)) stations++; });
+  BATCHES.forEach(b => {
+    if(set.has(`batch:${b.id}`)){ batchCount++; volume += b.volume; }
+  });
+
+  document.getElementById("vFarmers").textContent = farmers;
+  document.getElementById("vPlots").textContent = plots;
+  document.getElementById("vArea").textContent = `${area.toFixed(1)} ha`;
+  document.getElementById("vStations").textContent = stations;
+  document.getElementById("vBatches").textContent = batchCount;
+  document.getElementById("vVolume").textContent = `${volume.toFixed(1)} MT`;
+  document.getElementById("vComp").textContent = plotCountLabel(eudrOk, plots);
+
+  ["stFarmers","stPlots","stArea","stStations","stBatches","stVolume","stComp"].forEach(id => {
+    const e = document.getElementById(id);
+    e.classList.remove("flash"); void e.offsetWidth; e.classList.add("flash");
+  });
+}
+function plotCountLabel(ok, total){
+  if(total === 0) return "—";
+  return `${ok}/${total}`;
+}
+
+/* ---- Detail panel ---- */
+function chipsFor(ids){
+  if(!ids.length) return `<span style="color:var(--ink-soft);">None</span>`;
+  return ids.map(id => {
+    const n = nodes.get(id);
+    if(!n) return "";
+    return `<button type="button" class="link-chip" data-goto="${escapeHtml(id)}">${escapeHtml(n.label)}</button>`;
+  }).join("");
+}
+function eudrList(plots){
+  return plots.map(p => {
+    const farmer = farmerById.get(p.farmerId);
+    return `<div class="eudr-row">${eudrBadge(p.eudr)}<span class="farm-name">${escapeHtml(p.name)}</span><span style="color:var(--ink-soft);">· ${p.areaHa} ha · ${farmer ? escapeHtml(farmer.name) : ""}</span></div>`;
+  }).join("");
+}
+
+function detailFor(id){
+  const n = nodes.get(id);
+  const up = [...(inAdj.get(id) || [])];
+  const down = [...(outAdj.get(id) || [])];
+  const fields = [];
+
+  if(n.type === "farmer"){
+    const plots = PLOTS.filter(p => p.farmerId === n.ref.id);
+    const totalArea = plots.reduce((s,p) => s + p.areaHa, 0);
+    const c = eudrCounts(plots);
+    const dkg = DELIVERIES.filter(d => d.farmerId === n.ref.id).reduce((s,d) => s + d.weightKg, 0);
+    fields.push({ k:"Farmer ID", v:escapeHtml(n.ref.id) });
+    fields.push({ k:"Contact", v:`${escapeHtml(n.ref.phone)}` });
+    fields.push({ k:"Washing station", v:chipsFor([`station:${n.ref.stationKey}`]) });
+    fields.push({ k:"Farms owned", v:eudrList(plots) });
+    fields.push({ k:"EUDR compliance", v:`${c.ok}/${c.total} farm(s) compliant` });
+    fields.push({ k:"Total area", v:`${totalArea.toFixed(2)} ha` });
+    fields.push({ k:"Delivered (2026)", v:`${dkg.toFixed(1)} kg cherries` });
+    {
+      const chain = preciseFarmerChain(n.ref.id);
+      const aggIds = [...chain].filter(x => x.startsWith("aggregator:"));
+      const batchIds = [...chain].filter(x => x.startsWith("batch:"));
+      fields.push({ k:"Aggregator", v:aggIds.length ? chipsFor(aggIds) : "Not yet linked" });
+      fields.push({
+        k:"Contributes to batch(es)",
+        v:batchIds.length ? chipsFor(batchIds) : `<span style="color:var(--rust);font-weight:600;">None yet</span> — deliveries not reconciled to an export lot`
+      });
+    }
+  } else if(n.type === "plot"){
+    const farmer = farmerById.get(n.ref.farmerId);
+    const st = stationByKey.get(n.ref.stationKey);
+    fields.push({ k:"Farm / plot ID", v:escapeHtml(n.ref.id) });
+    fields.push({ k:"Owner", v:chipsFor([`farmer:${n.ref.farmerId}`]) });
+    fields.push({ k:"Station", v:chipsFor([`station:${n.ref.stationKey}`]) });
+    fields.push({ k:"District", v:st ? escapeHtml(st.region) : "—" });
+    fields.push({ k:"Area", v:`${n.ref.areaHa} ha` });
+    fields.push({ k:"Centroid", v:`${n.ref.center[0].toFixed(4)}, ${n.ref.center[1].toFixed(4)}` });
+    fields.push({ k:"EUDR status", v:eudrBadge(n.ref.eudr) });
+    if(farmer) fields.push({ k:"Chain", v:chipsFor([`farmer:${farmer.id}`, `station:${farmer.stationKey}`]) });
+    {
+      const chain = preciseFarmerChain(n.ref.farmerId);
+      const aggIds = [...chain].filter(x => x.startsWith("aggregator:"));
+      const batchIds = [...chain].filter(x => x.startsWith("batch:"));
+      fields.push({ k:"Aggregator", v:aggIds.length ? chipsFor(aggIds) : "Not yet linked" });
+      fields.push({
+        k:"Contributes to batch(es)",
+        v:batchIds.length ? chipsFor(batchIds) : `<span style="color:var(--rust);font-weight:600;">None yet</span> — this farmer's deliveries not reconciled to an export lot`
+      });
+    }
+  } else if(n.type === "station"){
+    const plots = PLOTS.filter(p => p.stationKey === n.ref.key);
+    const farmers = FARMERS.filter(f => f.stationKey === n.ref.key);
+    const c = eudrCounts(plots);
+    const dkg = DELIVERIES.filter(d => d.stationKey === n.ref.key).reduce((s,d) => s + d.weightKg, 0);
+    const lots = PURCHASES.filter(p => p.stationKey === n.ref.key);
+    fields.push({ k:"District", v:escapeHtml(n.ref.region) });
+    fields.push({ k:"Location", v:`${n.ref.lat.toFixed(4)}, ${n.ref.lng.toFixed(4)}` });
+    fields.push({ k:"Aggregator", v:chipsFor([`aggregator:${n.ref.aggregatorKey}`]) });
+    fields.push({ k:"Farmers", v:chipsFor(farmers.map(f => `farmer:${f.id}`)) });
+    fields.push({ k:"Farms received", v:eudrList(plots) });
+    fields.push({ k:"EUDR compliance", v:`${c.ok}/${c.total} farm(s) compliant` });
+    fields.push({ k:"Deliveries (2026)", v:`${dkg.toFixed(1)} kg` });
+    fields.push({ k:"Purchase lots", v:lots.map(l => `<span class="link-chip">${l.lot}</span>`).join("") || "None" });
+  } else if(n.type === "aggregator"){
+    const stations = STATIONS.filter(s => s.aggregatorKey === n.ref.key);
+    const batches = BATCHES.filter(b => b.aggregatorKey === n.ref.key);
+    const vol = batches.reduce((s,b) => s + b.volume, 0);
+    const risk = batches.filter(b => b.status !== "Compliant").length;
+    fields.push({ k:"Country", v:escapeHtml(n.ref.country) });
+    fields.push({ k:"Export licence", v:escapeHtml(n.ref.license) });
+    fields.push({ k:"Stations", v:chipsFor(stations.map(s => `station:${s.key}`)) });
+    fields.push({ k:"Batches", v:chipsFor(batches.map(b => `batch:${b.id}`)) });
+    fields.push({ k:"Total volume", v:`${vol.toFixed(1)} MT` });
+    fields.push({ k:"EUDR status", v:eudrBadge(batches.length ? (risk ? "At Risk" : "Compliant") : "Pending") });
+  } else if(n.type === "batch"){
+    const trace = preciseTraceForBatch(n.ref);
+    const poolTotal = trace.farmers.length + trace.pooledOnlyFarmers.length;
+    fields.push({ k:"Shipment date", v:escapeHtml(n.ref.date) });
+    fields.push({ k:"Container ref", v:escapeHtml(n.ref.containerRef) });
+    fields.push({ k:"Volume", v:`${n.ref.volume.toFixed(1)} MT` });
+    fields.push({ k:"EUDR status", v:`${eudrBadge(n.ref.status)}<br><span style="font-size:11px;color:var(--ink-soft);">${escapeHtml(n.ref.eudrNote)}</span>` });
+    fields.push({ k:"Aggregator", v:chipsFor([`aggregator:${n.ref.aggregatorKey}`]) });
+    fields.push({ k:"Importer", v:chipsFor([`importer:${n.ref.importerCode}`]) });
+    fields.push({ k:"Purchase lots in this batch", v:(n.ref.lots || []).map(l => `<span class="link-chip">${escapeHtml(l)}</span>`).join("") || "None recorded" });
+    fields.push({
+      k:"Verified contributing farms",
+      v:`<strong>${trace.farmers.length}/${poolTotal || trace.farmers.length}</strong> farms confirmed by a lot-tagged delivery record` +
+        (trace.farmers.length ? `<br>${chipsFor(trace.farmers.map(f => `farmer:${f.id}`))}` : "")
+    });
+    if(trace.pooledOnlyFarmers.length){
+      fields.push({
+        k:"Aggregator-wide roster (unverified)",
+        v:`${trace.pooledOnlyFarmers.length} more farm(s) sell to the same aggregator/station(s) but aren't tied to this batch's specific lots` +
+          `<br>${chipsFor(trace.pooledOnlyFarmers.map(f => `farmer:${f.id}`))}`
+      });
+    }
+    if(trace.unreconciledDeliveries.length){
+      fields.push({
+        k:"Data-quality gap",
+        v:`${trace.unreconciledDeliveries.length} delivery record(s) at the sourcing station(s) have no purchase-lot reference yet, so they can't be confirmed or ruled out as contributors`
+      });
+    }
+    const linkedStations = STATIONS.filter(s => s.aggregatorKey === n.ref.aggregatorKey);
+    fields.push({ k:"Source stations (aggregator-wide)", v:chipsFor(linkedStations.map(s => `station:${s.key}`)) });
+  } else if(n.type === "importer"){
+    const batches = BATCHES.filter(b => b.importerCode === n.ref.code);
+    const vol = batches.reduce((s,b) => s + b.volume, 0);
+    const compliant = batches.filter(b => b.status === "Compliant").length;
+    fields.push({ k:"Country", v:escapeHtml(n.ref.country) });
+    fields.push({ k:"EORI number", v:escapeHtml(n.ref.eori) });
+    fields.push({ k:"Batches received", v:chipsFor(batches.map(b => `batch:${b.id}`)) });
+    fields.push({ k:"Total volume", v:`${vol.toFixed(1)} MT` });
+    fields.push({ k:"EUDR status", v:`<span class="badge ${compliant === batches.length ? "badge-compliant" : "badge-pending"}">${compliant}/${batches.length} compliant</span>` });
+  } else if(n.type === "delivery"){
+    const f = farmerById.get(n.ref.farmerId);
+    const st = stationByKey.get(n.ref.stationKey);
+    fields.push({ k:"Record type", v:"Cherry delivery" });
+    fields.push({ k:"Date", v:escapeHtml(n.ref.date) });
+    fields.push({ k:"Weight", v:`${n.ref.weightKg} kg` });
+    fields.push({ k:"Farmer", v:chipsFor(f ? [`farmer:${f.id}`] : []) });
+    fields.push({ k:"Station", v:chipsFor(st ? [`station:${st.key}`] : []) });
+    const purForLot = n.ref.lot ? purchaseByLot.get(n.ref.lot) : null;
+    fields.push({ k:"Pooled into lot", v:n.ref.lot ? `<span class="link-chip">${escapeHtml(n.ref.lot)}</span>${purForLot ? chipsFor([`purchase:${purForLot.id}`]) : ""}` : `<span style="color:var(--rust);font-weight:600;">Not yet reconciled to a lot</span>` });
+    if(n.ref.notes) fields.push({ k:"Note", v:escapeHtml(n.ref.notes) });
+  } else if(n.type === "purchase"){
+    const st = stationByKey.get(n.ref.stationKey);
+    const ag = aggByKey.get(n.ref.aggregatorKey);
+    fields.push({ k:"Record type", v:"Station purchase lot" });
+    fields.push({ k:"Lot ref", v:escapeHtml(n.ref.lot) });
+    fields.push({ k:"Date", v:escapeHtml(n.ref.date) });
+    fields.push({ k:"Weight", v:`${n.ref.weightKg} kg` });
+    fields.push({ k:"Station", v:chipsFor(st ? [`station:${st.key}`] : []) });
+    fields.push({ k:"Aggregator", v:chipsFor(ag ? [`aggregator:${ag.key}`] : []) });
+    const feedsBatches = BATCHES.filter(b => (b.lots || []).includes(n.ref.lot));
+    const pooledDeliveries = DELIVERIES.filter(d => d.lot === n.ref.lot);
+    fields.push({ k:"Feeds batch(es)", v:feedsBatches.length ? chipsFor(feedsBatches.map(b => `batch:${b.id}`)) : "Not yet linked to an export batch" });
+    fields.push({ k:"Deliveries pooled into this lot", v:pooledDeliveries.length ? chipsFor(pooledDeliveries.map(d => `delivery:${d.id}`)) : "None recorded" });
+  }
+
+  if(up.length) fields.push({ k:"Upstream", v:chipsFor(up) });
+  if(down.length) fields.push({ k:"Downstream", v:chipsFor(down) });
+  return fields;
+}
+
+function renderDetail(){
+  const panel = document.getElementById("detailPanel");
+  if(!selection){
+    panel.classList.remove("open");
+    return;
+  }
+  const n = nodes.get(selection);
+  if(!n){ panel.classList.remove("open"); return; }
+  document.getElementById("dType").textContent = TYPE_LABELS[n.type] || n.type;
+  document.getElementById("dTitle").textContent = n.label;
+  const body = document.getElementById("detailBody");
+  body.innerHTML = detailFor(selection).map(f =>
+    `<div class="detail-field"><div class="k">${f.k}</div><div class="v">${f.v}</div></div>`
+  ).join("");
+  body.querySelectorAll("[data-goto]").forEach(btn => {
+    btn.addEventListener("click", () => setSelection(btn.dataset.goto, { force:true }));
+  });
+  panel.classList.add("open");
+}
+
+document.getElementById("btnCloseDetail").addEventListener("click", () => setSelection(null));
+document.getElementById("btnClear").addEventListener("click", () => setSelection(null));
+
+/* ---- Dynamic lineage ---- */
+function renderLineage(){
+  const set = connected || new Set(nodes.keys());
+  const stages = [
+    { step:"stepFarmer", lbl:"lcFarmer", count:FARMERS.filter(f => set.has(`farmer:${f.id}`)).length },
+    { step:"stepStation", lbl:"lcStation", count:STATIONS.filter(s => set.has(`station:${s.key}`)).length },
+    { step:"stepAggregator", lbl:"lcAggregator", count:AGGREGATORS.filter(a => set.has(`aggregator:${a.key}`)).length },
+    { step:"stepBatch", lbl:"lcBatch", count:BATCHES.filter(b => set.has(`batch:${b.id}`)).length },
+    { step:"stepImporter", lbl:"lcImporter", count:IMPORTERS.filter(i => set.has(`importer:${i.code}`)).length }
+  ];
+  stages.forEach(st => {
+    const el = document.getElementById(st.step);
+    const lbl = document.getElementById(st.lbl);
+    if(connected){
+      el.classList.toggle("in-chain", st.count > 0);
+      lbl.textContent = st.count > 0 ? `${st.count} in chain` : "not in chain";
+    } else {
+      el.classList.remove("in-chain");
+      lbl.textContent = "all in scope";
+    }
+  });
+}
+
+function renderHints(){
+  const shown = connected
+    ? BATCHES.filter(b => connected.has(`batch:${b.id}`)).length
+    : BATCHES.length;
+  document.getElementById("tableHint").textContent =
+    connected ? `${shown} of ${BATCHES.length} batches` : `${BATCHES.length} total`;
+  document.getElementById("mapHint").textContent =
+    selection ? "chain highlighted, others faded" : "Click to trace a chain";
+}
+
+/* ---- Print report ---- */
+function renderReport(){
+  const set = connected || new Set(nodes.keys());
+  const scopeFarmers = FARMERS.filter(f => set.has(`farmer:${f.id}`));
+  const scopePlots = PLOTS.filter(p => set.has(`plot:${p.id}`));
+  const scopeStations = STATIONS.filter(s => set.has(`station:${s.key}`));
+  const scopeAgg = AGGREGATORS.filter(a => set.has(`aggregator:${a.key}`));
+  const scopeImp = IMPORTERS.filter(i => set.has(`importer:${i.code}`));
+  const scopeBatches = BATCHES.filter(b => set.has(`batch:${b.id}`));
+  const c = eudrCounts(scopePlots);
+  const vol = scopeBatches.reduce((s,b) => s + b.volume, 0);
+  const atRiskBatches = scopeBatches.filter(b => b.status !== "Compliant");
+  const undocDeliveries = DELIVERIES.filter(d => set.has(`delivery:${d.id}`) && d.notes);
+  const selBatch = (selection && nodes.get(selection).type === "batch") ? nodes.get(selection).ref : null;
+  const trace = selBatch ? preciseTraceForBatch(selBatch) : null;
+
+  const now = new Date();
+  document.getElementById("repDate").textContent = now.toLocaleString();
+  document.getElementById("repScope").textContent = selection ? `${TYPE_LABELS[nodes.get(selection).type]} — ${nodes.get(selection).label}` : "Full network (no filter applied)";
+  document.getElementById("repId").textContent = `NAEB-${now.toISOString().slice(0,10).replace(/-/g,"")}-${Math.abs(hashCode(selection || "ALL")).toString(36).slice(0,5).toUpperCase()}`;
+  document.getElementById("repFootRight").textContent = `Page generated ${now.toLocaleDateString()} · ${scopeBatches.length} batch(es), ${scopePlots.length} plot(s) shown`;
+
+  document.getElementById("repIntro").textContent = selection
+    ? `This summary covers the traced chain of custody for the selected ${TYPE_LABELS[nodes.get(selection).type].toLowerCase()} (${nodes.get(selection).label}) only — every table below is filtered to the plots, operators and batches connected to that selection, in line with Regulation (EU) 2023/1115 (EUDR) traceability requirements.`
+    : `This summary covers the full traced network with no selection applied. Filter by importer, aggregator, station or farmer in the portal, then re-print to generate a due diligence summary scoped to a single shipment or batch.`;
+
+  document.getElementById("repStats").innerHTML = [
+    ["Farmers", scopeFarmers.length],
+    ["Farms / plots", scopePlots.length],
+    ["Area", c.total ? `${scopePlots.reduce((s,p)=>s+p.areaHa,0).toFixed(1)} ha` : "0"],
+    ["Stations", scopeStations.length],
+    ["Batches", scopeBatches.length],
+    ["Volume", `${vol.toFixed(1)} MT`],
+    ["EUDR compliant", c.total ? `${c.ok}/${c.total} farms` : "—"]
+  ].map(([k,v]) => `<div class="stat"><div class="stat-val">${escapeHtml(String(v))}</div><div class="stat-lbl">${k}</div></div>`).join("");
+
+  const overallRisk = !c.total ? "Undetermined" : (c.risk === 0 && atRiskBatches.length === 0 ? "Negligible" : "Standard — risk identified");
+  document.getElementById("repEudrNote").innerHTML =
+    `<strong>Risk classification: ${overallRisk}.</strong> ${c.total} plot(s) in scope — ${c.ok} EUDR-compliant (geolocated, verified deforestation-free), ${c.risk} not yet compliant. ` +
+    `${atRiskBatches.length ? `${atRiskBatches.length} of ${scopeBatches.length} export batch(es) inherit an "At risk" status because they draw on at least one non-compliant plot upstream.` : "All export batches in scope inherit a compliant status from their upstream plots."} ` +
+    `Per Article 10 of the EUDR, this places the ${overallRisk === "Negligible" ? "consignment(s) in the negligible-risk category, eligible for the simplified due diligence procedure." : "flagged consignment(s) in a risk category requiring mitigation before placing on the EU market."}`;
+
+  document.getElementById("reportRisk").innerHTML = [
+    ["Geolocation available for all plots (Art. 9(1)(d))", `${c.total}/${c.total} plots carry recorded coordinates` ],
+    ["Deforestation-free status (Art. 3(a))", `${c.ok}/${c.total} plots confirmed compliant; ${c.risk} pending verification`],
+    ["Legality of production (Art. 3(b))", scopeStations.length ? `Verified via ${scopeStations.length} registered washing station(s)` : "No station on record for this scope"],
+    ["Chain-of-custody traceability (Art. 4–5)", `${scopePlots.length} plot(s) → ${scopeFarmers.length} farmer(s) → ${scopeStations.length} station(s) → ${scopeAgg.length} aggregator(s) → ${scopeImp.length} importer(s), fully ID-linked`],
+    ...(trace ? [["Lot-level verification (this batch)", `${trace.farmers.length}/${trace.farmers.length + trace.pooledOnlyFarmers.length} contributing farms confirmed by a lot-tagged delivery record; the remainder reflect aggregator-wide mass balance, not a confirmed lot match`]] : []),
+    ["Data-quality exceptions", (undocDeliveries.length || (trace && trace.unreconciledDeliveries.length)) ? `${undocDeliveries.length} delivery record(s) flagged with a note (e.g. missing scale ticket)${trace && trace.unreconciledDeliveries.length ? `; ${trace.unreconciledDeliveries.length} at sourcing station(s) with no purchase-lot reference` : ""}` : "No flagged records in scope"]
+  ].map(([k,v]) => `<tr><td style="font-weight:600;width:38%;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("");
+
+  document.getElementById("reportFarmers").innerHTML = scopeFarmers.map(f => {
+    const st = stationByKey.get(f.stationKey);
+    const farms = PLOTS.filter(p => p.farmerId === f.id);
+    const fc = eudrCounts(farms);
+    const rowClass = farms.some(p => p.eudr === "Non-compliant") ? "row-noncompliant"
+      : farms.some(p => p.eudr !== "Compliant") ? "row-atrisk" : "";
+    return `<tr class="${rowClass}">
+      <td class="batch-id">${escapeHtml(f.id)}</td>
+      <td>${escapeHtml(f.name)}</td>
+      <td>${st ? escapeHtml(st.name) : "—"}</td>
+      <td>${farms.length}</td>
+      <td>${fc.total ? `${fc.ok}/${fc.total} compliant` : "—"}</td>
+      <td>${escapeHtml(f.phone)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6">No farmers in scope.</td></tr>`;
+
+  document.getElementById("reportPlots").innerHTML = scopePlots.map(p => {
+    const f = farmerById.get(p.farmerId);
+    const st = stationByKey.get(p.stationKey);
+    const rowClass = p.eudr === "Non-compliant" ? "row-noncompliant" : (p.eudr !== "Compliant" ? "row-atrisk" : "");
+    return `<tr class="${rowClass}">
+      <td class="batch-id">${escapeHtml(p.id)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${f ? escapeHtml(f.name) : "—"}</td>
+      <td>${st ? escapeHtml(st.name) : "—"}</td>
+      <td>${st ? escapeHtml(st.region) : "—"}</td>
+      <td>${p.center[0].toFixed(4)}</td>
+      <td>${p.center[1].toFixed(4)}</td>
+      <td>${p.areaHa} ha</td>
+      <td>${eudrBadge(p.eudr)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="9">No farms in scope.</td></tr>`;
+
+  document.getElementById("reportStations").innerHTML = scopeStations.map(s => {
+    const a = aggByKey.get(s.aggregatorKey);
+    const farms = PLOTS.filter(p => p.stationKey === s.key).length;
+    const farmers = FARMERS.filter(f => f.stationKey === s.key).length;
+    return `<tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td>${escapeHtml(s.region)}</td>
+      <td>${a ? escapeHtml(a.name) : "—"}</td>
+      <td>${farmers}</td>
+      <td>${farms}</td>
+      <td>${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6">No stations in scope.</td></tr>`;
+
+  document.getElementById("reportBatches").innerHTML = scopeBatches.map(b => {
+    const a = aggByKey.get(b.aggregatorKey);
+    const i = impByCode.get(b.importerCode);
+    const rowClass = b.status === "Non-compliant" ? "row-noncompliant" : (b.status !== "Compliant" ? "row-atrisk" : "");
+    return `<tr class="${rowClass}">
+      <td class="batch-id">${escapeHtml(b.id)}</td>
+      <td>${escapeHtml(b.date)}</td>
+      <td>${a ? escapeHtml(a.name) : "—"}</td>
+      <td>${i ? escapeHtml(i.name) : "—"}</td>
+      <td class="batch-id">${escapeHtml(b.containerRef)}</td>
+      <td>${b.volume.toFixed(1)}</td>
+      <td>${eudrBadge(b.status)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7">No batches in scope.</td></tr>`;
+
+  const partnerRows = scopeAgg.map(a => `<tr><td>Aggregator</td><td>${escapeHtml(a.name)}</td><td>${escapeHtml(a.country)}</td><td>${escapeHtml(a.license)}</td><td>${escapeHtml(a.contact)}</td></tr>`)
+    .concat(scopeImp.map(i => `<tr><td>Importer</td><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.country)}</td><td>${escapeHtml(i.eori)}</td><td>${escapeHtml(i.contact)}</td></tr>`));
+  document.getElementById("reportPartners").innerHTML = partnerRows.join("") || `<tr><td colspan="5">No aggregators or importers in scope.</td></tr>`;
+}
+function hashCode(str){
+  let h = 0;
+  for(let i = 0; i < str.length; i++){ h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+  return h;
+}
+
+/* ---- Bidirectional scope filter ---- */
+function fillSelect(sel, entries, placeholder){
+  sel.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = placeholder;
+  sel.appendChild(all);
+  entries.forEach(([val, label]) => {
+    const o = document.createElement("option");
+    o.value = val;
+    o.textContent = label;
+    sel.appendChild(o);
+  });
+}
+function setSelectValue(sel, val){
+  if(!val) return;
+  if([...sel.options].some(o => o.value === val)) sel.value = val;
+}
+function rebuildFilters(){
+  const scope = connected || new Set(nodes.keys());
+  fillSelect(filterBar.importer,
+    IMPORTERS.filter(i => scope.has(`importer:${i.code}`)).map(i => [i.code, i.name]),
+    "All importers");
+  fillSelect(filterBar.aggregator,
+    AGGREGATORS.filter(a => scope.has(`aggregator:${a.key}`)).map(a => [a.key, a.name]),
+    "All aggregators");
+  fillSelect(filterBar.station,
+    STATIONS.filter(s => scope.has(`station:${s.key}`)).map(s => [s.key, s.name]),
+    "All stations");
+  fillSelect(filterBar.farmer,
+    FARMERS.filter(f => scope.has(`farmer:${f.id}`)).map(f => [f.id, f.name]),
+    "All farmers");
+}
+function upstreamChainFor(n){
+  const chain = [];
+  if(n.type === "farmer" || n.type === "plot"){
+    const st = n.type === "farmer"
+      ? stationByKey.get(n.ref.stationKey)
+      : stationByKey.get((farmerById.get(n.ref.farmerId) || {}).stationKey);
+    if(st){
+      chain.push(["station", st.key]);
+      chain.push(["aggregator", st.aggregatorKey]);
+    }
+  } else if(n.type === "station"){
+    chain.push(["aggregator", n.ref.aggregatorKey]);
+  } else if(n.type === "batch"){
+    chain.push(["aggregator", n.ref.aggregatorKey]);
+    chain.push(["importer", n.ref.importerCode]);
+  } else if(n.type === "delivery"){
+    chain.push(["station", n.ref.stationKey]);
+    const st = stationByKey.get(n.ref.stationKey);
+    if(st) chain.push(["aggregator", st.aggregatorKey]);
+  } else if(n.type === "purchase"){
+    chain.push(["aggregator", n.ref.aggregatorKey]);
+  }
+  return chain;
+}
+function syncFiltersFromSelection(){
+  rebuildFilters();
+  filterBar.importer.value = "";
+  filterBar.aggregator.value = "";
+  filterBar.station.value = "";
+  filterBar.farmer.value = "";
+  const n = selection ? nodes.get(selection) : null;
+  if(!n) return;
+  const selPairs = {
+    farmer: () => [["farmer", n.ref.id]],
+    plot: () => [["farmer", n.ref.farmerId]],
+    station: () => [["station", n.ref.key]],
+    aggregator: () => [["aggregator", n.ref.key]],
+    batch: () => [["aggregator", n.ref.aggregatorKey], ["importer", n.ref.importerCode]],
+    importer: () => [["importer", n.ref.code]],
+    delivery: () => [["farmer", n.ref.farmerId]],
+    purchase: () => [["station", n.ref.stationKey]]
+  };
+  (selPairs[n.type] ? selPairs[n.type]() : []).concat(upstreamChainFor(n)).forEach(([k, val]) => {
+    setSelectValue(filterBar[k], val);
+  });
+}
+const FILTER_KIND = { importer:"importer", aggregator:"aggregator", station:"station", farmer:"farmer" };
+["importer", "aggregator", "station", "farmer"].forEach(k => {
+  filterBar[k].addEventListener("change", () => {
+    const val = filterBar[k].value;
+    setSelection(val ? `${FILTER_KIND[k]}:${val}` : null, { force:true, fromFilter:true });
+  });
+});
+syncFiltersFromSelection();
+
+/* ---- Exports ---- */
+document.getElementById("btnPrint").addEventListener("click", () => window.print());
+document.getElementById("btnCsv").addEventListener("click", () => { exportCSV(); showToast("CSV downloaded"); });
+document.getElementById("btnCopyLink").addEventListener("click", async () => {
+  const url = location.href;
+  try{
+    await navigator.clipboard.writeText(url);
+    showToast(selection ? "Link to this chain copied" : "Link copied");
+  }catch(err){
+    showToast("Couldn't copy — copy from the address bar");
+  }
+});
+
+function csvEscape(v){
+  const s = String(v == null ? "" : v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function csvRows(){
+  const set = connected || new Set(nodes.keys());
+  const rows = [["Type","ID","Name","Context","Volume/Area","EUDR"]];
+  TYPE_ORDER.forEach(type => {
+    for(const [id, n] of nodes){
+      if(n.type !== type || !set.has(id)) continue;
+      let context = "", vol = "", status = "";
+      if(type === "farmer"){
+        const st = stationByKey.get(n.ref.stationKey);
+        const farms = PLOTS.filter(p => p.farmerId === n.ref.id);
+        const c = eudrCounts(farms);
+        context = st ? st.name : n.ref.stationKey;
+        vol = `${farms.length} farm(s)`;
+        status = `${c.ok}/${c.total} compliant`;
+      } else if(type === "plot"){
+        const f = farmerById.get(n.ref.farmerId);
+        context = `${f ? f.name : ""} · ${(stationByKey.get(n.ref.stationKey) || {}).name || ""}`;
+        vol = `${n.ref.areaHa} ha`;
+        status = n.ref.eudr;
+      } else if(type === "station"){
+        const a = aggByKey.get(n.ref.aggregatorKey);
+        context = `${n.ref.region} · ${a ? a.name : n.ref.aggregatorKey}`;
+      } else if(type === "aggregator"){
+        const batches = BATCHES.filter(b => b.aggregatorKey === n.ref.key);
+        vol = `${batches.reduce((s,b)=>s+b.volume,0).toFixed(1)} MT`;
+        status = batches.some(b => b.status !== "Compliant") ? "At Risk" : "Compliant";
+        context = `${n.ref.country} · ${n.ref.license}`;
+      } else if(type === "batch"){
+        const a = aggByKey.get(n.ref.aggregatorKey);
+        const i = impByCode.get(n.ref.importerCode);
+        const tr = preciseTraceForBatch(n.ref);
+        const poolTotal = tr.farmers.length + tr.pooledOnlyFarmers.length;
+        context = `${a ? a.name : ""} → ${i ? i.name : ""} · ${n.ref.date} · ${n.ref.containerRef}`;
+        vol = `${n.ref.volume.toFixed(1)} MT`;
+        status = `${n.ref.status} · ${tr.farmers.length}/${poolTotal || tr.farmers.length} farms lot-verified`;
+      } else if(type === "importer"){
+        context = `${n.ref.country} · EORI ${n.ref.eori}`;
+        const batches = BATCHES.filter(b => b.importerCode === n.ref.code);
+        vol = `${batches.reduce((s,b)=>s+b.volume,0).toFixed(1)} MT`;
+        status = `${batches.filter(b=>b.status==="Compliant").length}/${batches.length} compliant`;
+      }
+      rows.push([TYPE_LABELS[type], id, n.label, context, vol, status]);
+    }
+  });
+  return rows;
+}
+function exportCSV(){
+  const rows = csvRows();
+  const csv = rows.map(r => r.map(csvEscape).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type:"text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `naeb-traceability-${selection ? selection.replace(/[:]/g,"-") : "full-network"}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---- Utils / init ---- */
+function escapeHtml(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+window.addEventListener("hashchange", () => {
+  const id = selectionFromHash();
+  if(id !== selection){
+    selection = id;
+    connected = selection ? connectedSet(selection) : null;
+    syncFiltersFromSelection();
+    renderAll();
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && selection) setSelection(null);
+});
+
+selection = selectionFromHash();
+connected = selection ? connectedSet(selection) : null;
+syncFiltersFromSelection();
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+name: Sync ArcGIS farms and CWS to Supabase
+on:
+  schedule: [{cron: "*/15 * * * *"}]
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - run: node scripts/sync_arcgis.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ARCGIS_TOKEN: ${{ secrets.ARCGIS_TOKEN }}
+          ARCGIS_USER: ${{ secrets.ARCGIS_USER }}
+          ARCGIS_PASSWORD: ${{ secrets.ARCGIS_PASSWORD }}
+          PORTAL_URL: ${{ vars.PORTAL_URL }}
+          FARMS_ITEM_ID: ${{ vars.FARMS_ITEM_ID }}
+          FARMS_URL: ${{ vars.FARMS_URL }}
+          CWS_URL: ${{ vars.CWS_URL }}
+          CONVERSION_FIELD: ${{ vars.CONVERSION_FIELD }}

@@ -1,0 +1,6 @@
+# The browser sends the ArcGIS Portal token, not a Supabase JWT. The api function validates
+# the Portal token itself, so Supabase's own JWT check must be off for this function.
+project_id = "eudr-rwanda-phase3"
+
+[functions.api]
+verify_jwt = false

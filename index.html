@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rwanda Coffee Traceability · NAEB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="src/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script></head>
+<body>
+<section id="splash"><div class="sp-card"><div class="logo-xl">☕</div><h1>Rwanda Coffee Traceability</h1>
+<p class="muted">From the farm to the EU importer — for NAEB and the coffee value chain. Sign in with your NAEB portal account.</p>
+<form id="sform"><label>Username<input id="su" autocomplete="username" required autofocus></label><label>Password<input id="sp" type="password" autocomplete="current-password" required></label>
+<p id="smsg" class="err" role="alert"></p><button id="sgo" class="wide">Sign in</button></form>
+<small class="muted">Credentials go straight to gis.naeb.gov.rw and are never stored. Risk flags are pre-screening, not a legal EUDR determination.</small></div></section>
+<nav id="rail" hidden><div class="logo">☕</div><div id="navs"></div></nav>
+<div id="app" hidden>
+<header id="top"><button id="gsb" class="searchbtn"><span id="gsi"></span> Search farms, farmers, stations, batches… <kbd>/</kbd></button>
+<div id="crumbs"></div><span class="sp"></span><span id="src" class="muted"></span><div class="menuwrap"><button id="recbtn">+ Record</button><div id="recmenu" class="menu" hidden></div></div><button id="dpill" class="pillbtn" title="Data status"></button><span id="whoami" class="muted"></span><button id="signout" class="ghost">Sign out</button></header>
+<div id="banner" class="banner" hidden></div>
+<main>
+<section class="view on" id="v-map"><div id="map"></div>
+<button id="ptoggle" class="ptoggle" title="Hide or show the filters">✕</button>
+<aside id="explorer" class="panel">
+ <details id="flt" open><summary>Filters <a href="#" id="fclr">Clear all</a></summary>
+  <div class="fgrid"><div id="cDist"></div><div id="cSec"></div><div id="cStn" class="w"></div><div id="cExp"></div><div id="cImp"></div></div>
+  <div class="chips" id="riskChips"></div><div class="whenrow"><span class="muted">When mapped</span><div class="chips" id="whenChips"></div></div>
+  <label class="sw"><input type="checkbox" id="showInd" checked> Show indicative (demo) data</label></details>
+ <details id="browse"><summary>Browse list</summary>
+  <div class="tabs" id="tabs"></div>
+  <div class="srow"><input id="q" placeholder="Search this list…" aria-label="Search list"><select id="sort" aria-label="Sort by"></select><button id="sdir" class="ghost sq" title="Reverse order">↕</button></div>
+  <ul id="list"></ul></details></aside>
+<button id="mapfit" class="fab ghost" title="Zoom to what is in focus">⌖ Zoom to focus</button>
+<details id="legend" class="panel mini"></details></section>
+<section class="view" id="v-overview"><div class="vh"><h2>Overview</h2><span class="muted" id="ovnote"></span></div>
+ <div id="kpis" class="kgrid"></div>
+ <div class="two"><div class="card2"><h3>EUDR pre-screen</h3><div id="riskbar"></div></div><div class="card2"><h3>Data status</h3><div id="dstat"></div></div></div>
+ <div class="card2"><h3>When farms were mapped</h3><div id="timeline"></div></div></section>
+<section class="view" id="v-graph"><div class="vh"><h2>Network</h2><span class="muted">Follows your current focus. Dashed = indicative.</span></div><div id="graph"></div></section>
+<section class="view" id="v-registry"><div class="vh"><h2>Registry</h2><div class="seg" id="regtabs"></div><input id="rq" placeholder="Search…"><span class="muted" id="rnote"></span><span class="sp"></span><button id="radd" hidden>+ New</button></div>
+ <div class="scroll"><table><thead id="rth"></thead><tbody id="rtb"></tbody></table></div><div class="pager" id="rpager"></div></section>
+<section class="view" id="v-report"><div class="vh"><h2>Reports &amp; export</h2><span class="sp"></span><label class="inl">Map extract <select id="rbase"><option value="osm">Streets</option><option value="sat">Satellite</option></select></label><button id="csv" class="ghost">Export CSV</button><button id="print">Print / PDF</button><button id="link" class="ghost">Copy link</button></div>
+ <p id="rnote2" class="scopebox"></p><div id="repview"></div></section>
+<section class="view" id="v-admin"></section>
+</main></div>
+<aside id="drawer" hidden></aside>
+<dialog id="modal"></dialog>
+<dialog id="gs"><input id="gsq" placeholder="Search everything…" autocomplete="off" aria-label="Global search"><div id="gsr"></div></dialog>
+<dialog id="dlg"><form id="dform"><h3>Session expired</h3><p class="muted">Sign in again to continue. Nothing you typed is lost.</p>
+<label>Username<input id="du" autocomplete="username" required></label><label>Password<input id="dp" type="password" autocomplete="current-password" required></label>
+<p id="dmsg" class="err" role="alert"></p><div class="row"><button id="dgo">Sign in</button></div></form></dialog>
+<div id="report"></div><div class="toast" id="toast"></div>
+<script type="module" src="src/app.js"></script></body></html>

@@ -1,0 +1,910 @@
+{
+ "version": 1,
+ "models": [
+  {
+   "id": "cherry_delivery",
+   "name": "Cherry delivery",
+   "plural": "Cherry deliveries",
+   "icon": "scale",
+   "color": "#b7791f",
+   "storage": "table",
+   "key": "delivery_id",
+   "title": "delivery_id",
+   "listCols": [
+    "delivery_date",
+    "farmer_id",
+    "weight_kg",
+    "grade"
+   ],
+   "attachments": true,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "delivery_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "cws_id",
+     "label": "Washing station",
+     "type": "link",
+     "req": true,
+     "to": "cws"
+    },
+    {
+     "k": "farmer_id",
+     "label": "Farmer",
+     "type": "link",
+     "req": true,
+     "to": "farmer"
+    },
+    {
+     "k": "plot_id",
+     "label": "Farm (plot) the cherries came from",
+     "type": "link",
+     "req": true,
+     "to": "plot"
+    },
+    {
+     "k": "delivery_date",
+     "label": "Delivery date",
+     "type": "date",
+     "req": true
+    },
+    {
+     "k": "weight_kg",
+     "label": "Weight (kg)",
+     "type": "decimal",
+     "req": true,
+     "min": 0.1,
+     "max": 20000
+    },
+    {
+     "k": "grade",
+     "label": "Grade",
+     "type": "choice",
+     "req": false,
+     "choices": [
+      {
+       "code": "A",
+       "label": "Grade A"
+      },
+      {
+       "code": "B",
+       "label": "Grade B"
+      },
+      {
+       "code": "C",
+       "label": "Grade C"
+      },
+      {
+       "code": "floaters",
+       "label": "Floaters / low"
+      }
+     ]
+    },
+    {
+     "k": "price_per_kg",
+     "label": "Price per kg (RWF)",
+     "type": "decimal",
+     "req": false,
+     "min": 0,
+     "floor": "MIN_CHERRY_PRICE",
+     "help": "NAEB sets a minimum price. Higher prices are always allowed."
+    },
+    {
+     "k": "receipt_no",
+     "label": "Receipt no.",
+     "type": "text",
+     "req": false,
+     "len": 40
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    },
+    {
+     "k": "recorded_by",
+     "label": "Recorded by",
+     "type": "text",
+     "req": false,
+     "len": 80,
+     "auto": true
+    }
+   ]
+  },
+  {
+   "id": "lot",
+   "name": "Lot",
+   "plural": "Lots",
+   "icon": "layers",
+   "color": "#2f6b4f",
+   "storage": "table",
+   "key": "lot_id",
+   "title": "lot_id",
+   "listCols": [
+    "lot_date",
+    "cws_id",
+    "cherry_kg_in",
+    "parchment_kg_out",
+    "status"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "lot_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "cws_id",
+     "label": "Washing station",
+     "type": "link",
+     "req": true,
+     "to": "cws"
+    },
+    {
+     "k": "lot_date",
+     "label": "Lot date",
+     "type": "date",
+     "req": true
+    },
+    {
+     "k": "cherry_kg_in",
+     "label": "Cherries in (kg)",
+     "type": "decimal",
+     "req": true,
+     "min": 0.1
+    },
+    {
+     "k": "parchment_kg_out",
+     "label": "Parchment out (kg)",
+     "type": "decimal",
+     "req": false,
+     "min": 0
+    },
+    {
+     "k": "process",
+     "label": "Process",
+     "type": "choice",
+     "req": false,
+     "choices": [
+      {
+       "code": "washed",
+       "label": "Fully washed"
+      },
+      {
+       "code": "natural",
+       "label": "Natural"
+      },
+      {
+       "code": "honey",
+       "label": "Honey"
+      }
+     ]
+    },
+    {
+     "k": "status",
+     "label": "Status",
+     "type": "choice",
+     "req": true,
+     "choices": [
+      {
+       "code": "open",
+       "label": "Open"
+      },
+      {
+       "code": "closed",
+       "label": "Closed"
+      },
+      {
+       "code": "shipped",
+       "label": "Shipped"
+      }
+     ],
+     "default": "open"
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ],
+   "yieldRange": [
+    0.16,
+    0.22
+   ]
+  },
+  {
+   "id": "lot_delivery",
+   "name": "Lot–delivery link",
+   "plural": "Lot–delivery links",
+   "icon": "link",
+   "color": "#6b6459",
+   "storage": "table",
+   "key": "link_id",
+   "title": "link_id",
+   "listCols": [
+    "lot_id",
+    "delivery_id",
+    "kg_allocated"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "link_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "lot_id",
+     "label": "Lot",
+     "type": "link",
+     "req": true,
+     "to": "lot"
+    },
+    {
+     "k": "delivery_id",
+     "label": "Delivery",
+     "type": "link",
+     "req": true,
+     "to": "cherry_delivery"
+    },
+    {
+     "k": "kg_allocated",
+     "label": "Cherries allocated (kg)",
+     "type": "decimal",
+     "req": true,
+     "min": 0.1
+    }
+   ]
+  },
+  {
+   "id": "exporter",
+   "name": "Exporter",
+   "plural": "Exporters",
+   "icon": "truck",
+   "color": "#8b5e34",
+   "storage": "table",
+   "key": "exporter_id",
+   "title": "name",
+   "listCols": [
+    "name",
+    "licence_no",
+    "district"
+   ],
+   "attachments": true,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "exporter_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "name",
+     "label": "Name",
+     "type": "text",
+     "req": true,
+     "len": 150
+    },
+    {
+     "k": "licence_no",
+     "label": "Licence no.",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 60
+    },
+    {
+     "k": "contact",
+     "label": "Contact person",
+     "type": "text",
+     "req": false,
+     "len": 100
+    },
+    {
+     "k": "phone",
+     "label": "Phone",
+     "type": "text",
+     "req": false,
+     "len": 40
+    },
+    {
+     "k": "email",
+     "label": "Email",
+     "type": "text",
+     "req": false,
+     "len": 120
+    },
+    {
+     "k": "district",
+     "label": "District",
+     "type": "text",
+     "req": false,
+     "len": 60
+    },
+    {
+     "k": "address",
+     "label": "Address",
+     "type": "text",
+     "req": false,
+     "len": 200
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ]
+  },
+  {
+   "id": "importer",
+   "name": "Importer",
+   "plural": "Importers",
+   "icon": "globe",
+   "color": "#2b6cb0",
+   "storage": "table",
+   "key": "importer_id",
+   "title": "name",
+   "listCols": [
+    "name",
+    "country",
+    "eori"
+   ],
+   "attachments": true,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "importer_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "name",
+     "label": "Name",
+     "type": "text",
+     "req": true,
+     "len": 150
+    },
+    {
+     "k": "country",
+     "label": "Country",
+     "type": "text",
+     "req": true,
+     "len": 60
+    },
+    {
+     "k": "eori",
+     "label": "EORI no.",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40
+    },
+    {
+     "k": "contact",
+     "label": "Contact person",
+     "type": "text",
+     "req": false,
+     "len": 100
+    },
+    {
+     "k": "phone",
+     "label": "Phone",
+     "type": "text",
+     "req": false,
+     "len": 40
+    },
+    {
+     "k": "email",
+     "label": "Email",
+     "type": "text",
+     "req": false,
+     "len": 120
+    },
+    {
+     "k": "address",
+     "label": "Address",
+     "type": "text",
+     "req": false,
+     "len": 200
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ]
+  },
+  {
+   "id": "export_batch",
+   "name": "Export batch",
+   "plural": "Export batches",
+   "icon": "box",
+   "color": "#c8472f",
+   "storage": "table",
+   "key": "batch_id",
+   "title": "batch_id",
+   "listCols": [
+    "ship_date",
+    "exporter_id",
+    "importer_id",
+    "status"
+   ],
+   "attachments": true,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "batch_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "exporter_id",
+     "label": "Exporter",
+     "type": "link",
+     "req": true,
+     "to": "exporter"
+    },
+    {
+     "k": "importer_id",
+     "label": "Importer",
+     "type": "link",
+     "req": true,
+     "to": "importer"
+    },
+    {
+     "k": "container",
+     "label": "Container no.",
+     "type": "text",
+     "req": false,
+     "len": 30
+    },
+    {
+     "k": "ship_date",
+     "label": "Ship date",
+     "type": "date",
+     "req": false
+    },
+    {
+     "k": "dds_ref",
+     "label": "DDS reference",
+     "type": "text",
+     "req": false,
+     "len": 60
+    },
+    {
+     "k": "status",
+     "label": "Status",
+     "type": "choice",
+     "req": true,
+     "choices": [
+      {
+       "code": "planned",
+       "label": "Planned"
+      },
+      {
+       "code": "shipped",
+       "label": "Shipped"
+      },
+      {
+       "code": "arrived",
+       "label": "Arrived"
+      },
+      {
+       "code": "dds_submitted",
+       "label": "DDS submitted"
+      }
+     ],
+     "default": "planned"
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ]
+  },
+  {
+   "id": "batch_lot",
+   "name": "Batch–lot link",
+   "plural": "Batch–lot links",
+   "icon": "link",
+   "color": "#6b6459",
+   "storage": "table",
+   "key": "link_id",
+   "title": "link_id",
+   "listCols": [
+    "batch_id",
+    "lot_id",
+    "kg"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "link_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "batch_id",
+     "label": "Batch",
+     "type": "link",
+     "req": true,
+     "to": "export_batch"
+    },
+    {
+     "k": "lot_id",
+     "label": "Lot",
+     "type": "link",
+     "req": true,
+     "to": "lot"
+    },
+    {
+     "k": "kg",
+     "label": "Parchment kg",
+     "type": "decimal",
+     "req": true,
+     "min": 0.1
+    }
+   ]
+  },
+  {
+   "id": "user_assignment",
+   "name": "Station assignment",
+   "plural": "Station assignments",
+   "icon": "user",
+   "color": "#4a5568",
+   "storage": "table",
+   "key": "assignment_id",
+   "title": "username",
+   "listCols": [
+    "username",
+    "cws_id"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "assignment_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "username",
+     "label": "Portal username",
+     "type": "text",
+     "req": true,
+     "len": 80
+    },
+    {
+     "k": "cws_id",
+     "label": "Washing station",
+     "type": "link",
+     "req": true,
+     "to": "cws"
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "text",
+     "req": false,
+     "len": 200
+    }
+   ],
+   "adminOnly": true
+  },
+  {
+   "id": "cws_recorded",
+   "name": "Washing station (recorded)",
+   "plural": "Washing stations (recorded)",
+   "icon": "mappin",
+   "color": "#1f6b50",
+   "storage": "layer",
+   "key": "cws_id",
+   "title": "name",
+   "listCols": [
+    "name",
+    "district",
+    "sector",
+    "capacity_mt"
+   ],
+   "attachments": true,
+   "tracking": true,
+   "search": true,
+   "map": true,
+   "graph": true,
+   "fields": [
+    {
+     "k": "cws_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "name",
+     "label": "Name",
+     "type": "text",
+     "req": true,
+     "len": 150
+    },
+    {
+     "k": "owner_name",
+     "label": "Owner",
+     "type": "text",
+     "req": false,
+     "len": 150
+    },
+    {
+     "k": "district",
+     "label": "District",
+     "type": "text",
+     "req": true,
+     "len": 60
+    },
+    {
+     "k": "sector",
+     "label": "Sector",
+     "type": "text",
+     "req": false,
+     "len": 60
+    },
+    {
+     "k": "capacity_mt",
+     "label": "Capacity (MT)",
+     "type": "decimal",
+     "req": false,
+     "min": 0
+    },
+    {
+     "k": "phone",
+     "label": "Phone",
+     "type": "text",
+     "req": false,
+     "len": 40
+    },
+    {
+     "k": "email",
+     "label": "Email",
+     "type": "text",
+     "req": false,
+     "len": 120
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ],
+   "geometry": "point",
+   "adminOnly": true
+  },
+  {
+   "id": "farmer_recorded",
+   "name": "Farmer (recorded)",
+   "plural": "Farmers (recorded)",
+   "icon": "person",
+   "color": "#7a5c3e",
+   "storage": "table",
+   "key": "farmer_id",
+   "title": "full_name",
+   "listCols": [
+    "full_name",
+    "district",
+    "sector",
+    "cws_id"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "farmer_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "full_name",
+     "label": "Full name",
+     "type": "text",
+     "req": true,
+     "len": 120,
+     "pii": true
+    },
+    {
+     "k": "phone",
+     "label": "Phone",
+     "type": "text",
+     "req": false,
+     "len": 40,
+     "pii": true
+    },
+    {
+     "k": "district",
+     "label": "District",
+     "type": "text",
+     "req": false,
+     "len": 60
+    },
+    {
+     "k": "sector",
+     "label": "Sector",
+     "type": "text",
+     "req": false,
+     "len": 60
+    },
+    {
+     "k": "cws_id",
+     "label": "Washing station",
+     "type": "link",
+     "req": false,
+     "to": "cws"
+    },
+    {
+     "k": "notes",
+     "label": "Notes",
+     "type": "longtext",
+     "req": false
+    }
+   ],
+   "adminOnly": true
+  }
+ ],
+ "system": [
+  {
+   "id": "audit_log",
+   "name": "Audit log",
+   "plural": "Audit log",
+   "icon": "history",
+   "color": "#4a5568",
+   "storage": "table",
+   "key": "audit_id",
+   "title": "action",
+   "listCols": [
+    "at",
+    "username",
+    "model",
+    "action"
+   ],
+   "attachments": false,
+   "tracking": true,
+   "search": true,
+   "map": false,
+   "graph": true,
+   "fields": [
+    {
+     "k": "audit_id",
+     "label": "ID",
+     "type": "text",
+     "req": true,
+     "unique": true,
+     "len": 40,
+     "auto": true
+    },
+    {
+     "k": "model",
+     "label": "Model",
+     "type": "text",
+     "req": true,
+     "len": 60
+    },
+    {
+     "k": "record_id",
+     "label": "Record",
+     "type": "text",
+     "req": true,
+     "len": 60
+    },
+    {
+     "k": "action",
+     "label": "Action",
+     "type": "text",
+     "req": true,
+     "len": 20
+    },
+    {
+     "k": "username",
+     "label": "User",
+     "type": "text",
+     "req": true,
+     "len": 80
+    },
+    {
+     "k": "at",
+     "label": "When",
+     "type": "datetime",
+     "req": true
+    },
+    {
+     "k": "before",
+     "label": "Before",
+     "type": "longtext",
+     "req": false
+    },
+    {
+     "k": "after",
+     "label": "After",
+     "type": "longtext",
+     "req": false
+    }
+   ],
+   "system": true
+  }
+ ]
+}

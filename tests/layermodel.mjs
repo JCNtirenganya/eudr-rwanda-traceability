@@ -1,0 +1,14 @@
+// Run: node tests/layermodel.mjs
+import assert from "node:assert/strict";import {modelFromLayer,FARM}from "../src/layermodel.js";import {validateModel,toArcFields}from "../src/engine/schema.js";
+const F=(name,type,extra={})=>({name,type,alias:name,...extra});
+const meta={fields:[F("OBJECTID","esriFieldTypeOID"),F("plot_id","esriFieldTypeBigInteger"),F("farmer_id","esriFieldTypeBigInteger"),F("farmer_name","esriFieldTypeString",{length:50,alias:"Farmer name"}),F("phone","esriFieldTypeInteger"),
+ F("prior_land_use","esriFieldTypeString",{length:60,domain:{type:"codedValue",codedValues:[{code:"Cropland",name:"Cropland"},{code:"Forest",name:"Forest/Wooded land"}]}}),F("first_planting_year","esriFieldTypeDouble"),F("trees_total","esriFieldTypeInteger"),
+ F("survey_date","esriFieldTypeDate"),F("Shape__Area","esriFieldTypeDouble"),F("created_date","esriFieldTypeDate"),F("notes","esriFieldTypeString",{length:2000}),F("globalid","esriFieldTypeGlobalID"),F("Bad Name","esriFieldTypeString")]};
+const m=modelFromLayer(meta,FARM);const f=k=>m.fields.find(x=>x.k===k);let ok=0;const t=(n,fn)=>{try{fn();ok++;console.log("✓",n)}catch(e){console.log("✗",n,"\n ",e.message);process.exitCode=1}};
+t("system, shape, tracking and badly named fields are dropped",()=>{for(const k of["objectid","globalid","shape__area","created_date","bad name"])assert.ok(!f(k),k)});
+t("identifiers become text, whatever the layer stores (ids are not numbers)",()=>{for(const k of["plot_id","farmer_id","phone"])assert.equal(f(k).type,"text",k);assert.equal(f("plot_id").auto,true);assert.equal(f("plot_id").unique,true)});
+t("a coded domain becomes a choice list with the layer's own labels",()=>{const c=f("prior_land_use");assert.equal(c.type,"choice");assert.deepEqual(c.choices[1],{code:"Forest",label:"Forest/Wooded land"})});
+t("types and labels follow the layer; required comes from the questionnaire list",()=>{assert.equal(f("first_planting_year").type,"decimal");assert.equal(f("trees_total").type,"int");assert.equal(f("survey_date").type,"date");assert.equal(f("notes").type,"longtext");assert.equal(f("farmer_name").label,"Farmer name");assert.equal(f("farmer_name").req,true);assert.equal(f("survey_date").req,false)});
+t("the generated model is valid and becomes a polygon layer with GPS fields",()=>{assert.deepEqual(validateModel(m,[]),[]);assert.equal(m.storage,"layer");assert.equal(m.geometry,"polygon");assert.ok(f("gps_accuracy_m")&&f("gps_method"));const a=toArcFields(m);assert.ok(a.some(x=>x.name==="plot_id"&&x.type==="esriFieldTypeString")&&a.some(x=>x.name==="is_deleted"))});
+t("name, National ID and phone are flagged as personal data (table stays private, audit log omits them)",()=>{for(const k of["farmer_name","phone"])assert.equal(f(k).pii,true,k);assert.ok(!f("upi")?.pii)});
+console.log(`\n${ok} checks passed`);
