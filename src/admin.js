@@ -12,11 +12,11 @@ export async function renderAdmin(){
    ${me.isAdmin&&!CFG.OFFLINE_DEMO?`<button class="ghost" id="demoToggle">${CHAIN.every(i=>Data.backend[i]==="demo")?"Stop previewing demo data":"Preview the chain with demo data"}</button> <button class="ghost" id="selfTest">Test saving</button>`:""}</div>
    <div class="cards"><div class="cc"><span class="muted">Signed in as</span><b>${esc(me.fullName)}</b> ${esc(me.role)}${me.stations.length?` · ${me.stations.length} station(s)`:""}</div>
    <div class="cc"><span class="muted">Storage</span><b>${CFG.OFFLINE_DEMO?"Offline demo":"Supabase"}</b>${CFG.OFFLINE_DEMO?"Indicative only; nothing is saved.":"All app-owned records."}</div>
-   <div class="cc"><span class="muted">Portal data</span><b>Identity only</b>Names, phones and National IDs stay in ArcGIS; the app looks them up with your Portal login.</div>
+   <div class="cc"><span class="muted">Portal data</span><b>Farms, farmers, CWS</b>Real plots, personal identity and washing stations stay in ArcGIS; the app reads them with your Portal login.</div>
    <div class="cc"><span class="muted">Data status</span><b>${rows.length-demo} stored · ${demo} demo</b>Demo rows are labelled Indicative and are not saved.</div></div>
    ${CFG.OFFLINE_DEMO?`<p class="err">⚠ Temporary offline demo: Portal sign-in is still required. Set CFG.OFFLINE_DEMO to false after Supabase is configured.</p>`:""}${Data.warnings.map(w=>`<p class="err">⚠ ${esc(w)}</p>`).join("")}
    <div class="scroll models"><table><thead><tr><th>Model</th><th>Records</th><th>Stored in</th><th></th></tr></thead><tbody>${rows.map(r=>{const m=Data.models[r.id]||Data.system[r.id];
-     return`<tr><td><b>${esc(m.name)}</b><small class="muted">${m.fields.length} fields · key ${esc(m.key)}</small></td><td>${r.n}</td><td>${r.mode==="demo"?"Demo (not saved)":"Supabase"} ${tag(r.source)}</td>
+     return`<tr><td><b>${esc(m.name)}</b><small class="muted">${m.fields.length} fields · key ${esc(m.key)}</small></td><td>${r.n}</td><td>${r.mode==="demo"?"Demo (not saved)":r.mode==="disabled"?"Portal only (disabled)":"Supabase"} ${tag(r.source)}</td>
      <td><button class="ghost" data-prev="${r.id}">Preview</button></td></tr>`}).join("")}</tbody></table></div>
    <div id="prev"></div><div class="log" id="log" ${log?"":"hidden"}>${esc(log)}</div>`;
   $("#v-admin").onclick=async e=>{if(e.target.id==="selfTest")return selfTest(e.target);

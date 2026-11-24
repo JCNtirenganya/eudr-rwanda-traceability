@@ -1,16 +1,14 @@
-// One Edge Function for the whole app. The Portal token is the only credential the browser sends.
-// This function validates it against Portal, then talks to Postgres with the service key.
+// One Edge Function for the chain tables only. The Portal token is the only credential the browser sends.
+// Real farms, farmers and CWS stay in ArcGIS; Supabase holds deliveries, lots, batches and links.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const SB = Deno.env.get("SUPABASE_URL")!;
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PORTAL = Deno.env.get("PORTAL_URL") ?? "https://gis.naeb.gov.rw/portal";
 const OWNER = Deno.env.get("PORTAL_OWNER") ?? "Coffee_Trace";
-const PII: Record<string, string[]> = {
-  farm_recorded: ["farmer_name", "national_id", "phone"],
-  station_recorded: ["telephone", "f_email", "phone"],
-  farmer_recorded: ["full_name", "phone"],
-};
+const CHAIN = new Set([
+  "cherry_delivery", "lot", "lot_delivery", "export_batch", "batch_lot", "exporter", "importer",
+]);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -45,17 +43,10 @@ async function identity(portalToken: string) {
   if (!r.ok) throw new Error("Portal could not check your session.");
   const me = await r.json();
   if (me.error) throw new Error("Portal session expired. Please sign in again.");
+  if (!me.username) throw new Error("Portal did not return your account.");
   const username = me.username as string;
-  const profile = (await db(`profiles?portal_username=eq.${encodeURIComponent(username)}&select=*`))?.[0] ?? {};
-  const assigned = await db(
-    `records?model=eq.user_assignment&is_deleted=eq.false&attrs->>username=eq.${encodeURIComponent(username)}&select=attrs`,
-  );
-  const stations: string[] = profile.stations?.length
-    ? profile.stations
-    : (assigned ?? []).map((a: any) => a.attrs?.cws_id).filter(Boolean);
-  const isAdmin = profile.role === "admin" || me.role === "org_admin" || username === OWNER;
-  const role = isAdmin ? "admin" : stations.length ? "editor" : "viewer";
-  return { username, fullName: me.fullName || username, portalRole: me.role, isAdmin, role, stations };
+  const isAdmin = me.role === "org_admin" || username === OWNER;
+  return { username, fullName: me.fullName || username, portalRole: me.role, isAdmin, role: isAdmin ? "admin" : "viewer", stations: [] };
 }
 
 const shape = (r: any) => ({
@@ -69,43 +60,14 @@ const shape = (r: any) => ({
   last_edited_date: r.last_edited_date,
   deleted_by: r.deleted_by,
   deleted_at: r.deleted_at,
-  ...(r.geometry ? { geometry: r.geometry } : {}),
 });
-
-const scrubbing = (model: string, attrs: any) => {
-  const out = { ...(attrs ?? {}) };
-  for (const k of PII[model] ?? []) delete out[k];
-  return out;
-};
 
 async function handle(body: any, me: any) {
   const { action, model, key } = body ?? {};
+  if (action !== "me" && !CHAIN.has(model)) throw new Error("This table is not stored in Supabase; real farms and CWS stay on the Portal.");
   switch (action) {
     case "me":
       return me;
-    case "meta": {
-      const [m] = await db("source_meta?select=*");
-      return {
-        convField: m?.conv_field ?? "",
-        farmMeta: m?.farm_meta ?? {},
-        stationMeta: m?.station_meta ?? {},
-        syncedAt: m?.synced_at ?? null,
-      };
-    }
-    case "sources": {
-      const [m, farms, stations] = await Promise.all([
-        db("source_meta?select=*"),
-        db("source_farms?active=eq.true&select=attrs,geometry"),
-        db("source_stations?active=eq.true&select=attrs,geometry"),
-      ]);
-      return {
-        farms: (farms ?? []).map((f: any) => ({ attributes: f.attrs, geometry: f.geometry })),
-        stations: (stations ?? []).map((s: any) => ({ attributes: s.attrs, geometry: s.geometry })),
-        farmFields: (m?.[0]?.farm_meta?.fields ?? []).map((f: any) => f.name),
-        convField: m?.[0]?.conv_field ?? "",
-        syncedAt: m?.[0]?.synced_at ?? null,
-      };
-    }
     case "list":
       return (await db(`records?model=eq.${encodeURIComponent(model)}&is_deleted=eq.false&select=*`)).map(shape);
     case "count":
@@ -117,12 +79,11 @@ async function handle(body: any, me: any) {
       return row ? shape(row) : null;
     }
     case "create": {
-      if (!me.isAdmin && model === "user_assignment") throw new Error("Only admins can change station assignments.");
       const now = new Date().toISOString();
       const [row] = await db("records", {
         method: "POST",
         body: JSON.stringify({
-          model, rec_key: key, attrs: scrubbing(model, body.attrs), geometry: body.geometry ?? null,
+          model, rec_key: key, attrs: body.attrs ?? {},
           data_source: "recorded", created_user: me.username, created_date: now,
           last_edited_user: me.username, last_edited_date: now,
         }),
@@ -134,8 +95,7 @@ async function handle(body: any, me: any) {
       const [row] = await db(
         `records?model=eq.${encodeURIComponent(model)}&rec_key=eq.${encodeURIComponent(key)}&is_deleted=eq.false`,
         { method: "PATCH", body: JSON.stringify({
-          attrs: scrubbing(model, body.attrs), geometry: body.geometry ?? null,
-          last_edited_user: me.username, last_edited_date: now,
+          attrs: body.attrs ?? {}, last_edited_user: me.username, last_edited_date: now,
         }) },
       );
       if (!row) throw new Error("Record no longer exists.");

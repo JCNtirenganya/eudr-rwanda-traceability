@@ -1,6 +1,6 @@
 // Record forms, generated from the model definitions. One engine; delivery, lot and batch add the pieces they need.
 // A form never closes on an error and never loses what was typed.
-import {Data} from "./data/index.js";
+import {Data,DISABLED} from "./data/index.js";
 import {T,chain} from "./trace.js";
 import {validateRecord} from "./engine/schema.js";
 import {capturePoint} from "./gps.js";
@@ -10,11 +10,12 @@ const today=()=>new Date().toISOString().slice(0,10),mask=n=>n?"•••• "+S
 const me=()=>Data.me,mine=id=>me().isAdmin||me().stations.includes(id);
 const MODEL_OF={plot:"farm_recorded",delivery:"cherry_delivery",lot:"lot",batch:"export_batch",exporter:"exporter",importer:"importer"};
 const NEW=[["cherry_delivery","Record a cherry delivery"],["lot","New lot"],["export_batch","New export batch"],["exporter","New exporter"],["importer","New importer"],["user_assignment","Assign staff to a station"]];
-const QUEST=[["farm_recorded","Register a farmer & map their farms"],["station_recorded","Map a washing station"]];
-export const canNew=id=>{const m=Data.models[id];return!!m&&(me().isAdmin||(me().role==="editor"&&!m.adminOnly&&(["cherry_delivery","lot"].includes(id)||m.mirror)))};
-export const newMenu=()=>[...QUEST,...NEW].filter(([id])=>canNew(id)).map(([id,l])=>[id,l+(Data.raw[id]?.kind==="demo"?"  (demo — not saved)":"")]);
+// Read-only Portal lookup; recorded farm/CWS forms are disabled.
+const QUEST=[["find_farmer","Find a farmer in Portal (read only)"]];
+export const canNew=id=>{const m=Data.models[id];return!!m&&!DISABLED.has(id)&&(me().isAdmin||(me().role==="editor"&&!m.adminOnly&&["cherry_delivery","lot"].includes(id)))};
+export const newMenu=()=>[...QUEST,...NEW].filter(([id])=>id==="find_farmer"||canNew(id)).map(([id,l])=>[id,l+(Data.raw[id]?.kind==="demo"?"  (demo — not saved)":"")]);
 // ---- who may change an existing record, and which model it belongs to
-export function editInfo(type,id){const mid=type==="station"?(Data.raw.station_recorded?"station_recorded":"cws_recorded"):MODEL_OF[type];if(!mid||!Data.raw[mid]||Data.raw[mid].kind==="demo")return null;
+export function editInfo(type,id){const mid=type==="station"?(Data.raw.station_recorded?"station_recorded":"cws_recorded"):MODEL_OF[type];if(!mid||!Data.raw[mid]||["demo","disabled"].includes(Data.raw[mid].kind))return null;
   const rec=({plot:T.farmById,delivery:T.del,lot:T.lot,batch:T.bat,exporter:T.exp,importer:T.imp,station:T.stations}[type]||{})[id];if(!rec||rec.src==="live"||rec.src==="indicative")return null;
   const m=Data.models[mid],full=rec;return Data.me.isAdmin||(me().role==="editor"&&["cherry_delivery","lot"].includes(mid)&&mine(rec.cws_id))?{mid,model:m,rec:full}:null}
 // ---- option lists for link fields

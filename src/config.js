@@ -1,4 +1,4 @@
-// Portal stays the app's login and the home of personal data. Supabase holds everything the app records.
+// Portal is the login and the home of real farms, farmers and CWS. Supabase holds chain records only.
 // Set the two Supabase values below after creating the project. Use the public anon/publishable key
 // here; the service role key belongs only in GitHub Secrets and the Edge Function environment.
 export const CFG = {
@@ -12,6 +12,6 @@ export const CFG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY",
   API_URL: "",                   // empty = SUPABASE_URL + "/functions/v1/api"
-  OFFLINE_DEMO: true,            // temporary: require Portal sign-in, then open with indicative data (no Supabase)
+  OFFLINE_DEMO: true,            // temporary: Portal sign-in, then indicative chain data (no Supabase yet)
   MIN_CHERRY_PRICE: 800,         // NAEB minimum cherry price (RWF/kg), set by NAEB per season
 };

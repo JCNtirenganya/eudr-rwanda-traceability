@@ -1,4 +1,4 @@
-name: Migrate existing Portal tables to Supabase
+name: Migrate chain tables from Portal to Supabase
 on: {workflow_dispatch: {}}
 jobs:
   migrate:

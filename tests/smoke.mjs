@@ -30,7 +30,7 @@ const farmMeta={fields:[FT("OBJECTID","esriFieldTypeOID"),FT("plot_id"),FT("farm
 const stMeta={fields:[FT("cws_name"),FT("name_of_cw"),FT("owner_name"),FT("type_of_ow","esriFieldTypeString",{domain:{type:"codedValue",codedValues:[{code:"Private",name:"Private"},{code:"Cooperative",name:"Cooperative"}]}}),FT("province"),FT("district"),FT("sector"),FT("cell"),FT("village"),FT("year_of_es","esriFieldTypeInteger"),FT("processing","esriFieldTypeInteger"),FT("telephone"),FT("x_coordina","esriFieldTypeDouble"),FT("y_coordina","esriFieldTypeDouble")]};
 const MODELS={farm_recorded:modelFromLayer(farmMeta,FARM),station_recorded:modelFromLayer(stMeta,STATION)};
 const FAKE_STATIONS=()=>[0,1,2,3].map(i=>({attributes:{cws_uid:"ID-"+i,globalid:`{ID-${i}}`,cws_name:"CWS "+i,district:"Gatsibo",sector:"S"+(i%2),y_coordinate:-1.7,x_coordinate:30.3+i/10},geometry:null}));
-const FAKE_FARMS=()=>Array.from({length:60},(_,i)=>({attributes:{plot_id:String(i),farmer_id:String(Math.floor(i/2)),farmer_name:"Farmer Name "+i,national_id:"119988"+String(1e9+i).slice(1,11),district:"Gatsibo",sector:"S"+(i%2),cell:"c",area_ha:.05,farmer_prod_kg_2025:400,prior_land_use:"Cropland",first_planting_year:2005,survey_date:Date.now()-(i%5)*864e5},geometry:{rings:[[[30.3+i/1e4,-1.7],[30.3002+i/1e4,-1.7],[30.3002+i/1e4,-1.7002],[30.3+i/1e4,-1.7]]]}}));
+const FAKE_FARMS=()=>Array.from({length:60},(_,i)=>({attributes:{plot_id:String(i),farmer_id:String(Math.floor(i/2)),farmer_name:"Farmer Name "+i,national_id:"119988"+String(1e10+i).slice(1,11),district:"Gatsibo",sector:"S"+(i%2),cell:"c",area_ha:.05,farmer_prod_kg_2025:400,prior_land_use:"Cropland",first_planting_year:2005,survey_date:Date.now()-(i%5)*864e5},geometry:{rings:[[[30.3+i/1e4,-1.7],[30.3002+i/1e4,-1.7],[30.3002+i/1e4,-1.7002],[30.3+i/1e4,-1.7]]]}}));
 function fakeApi(b){
  const j=v=>({ok:true,value:v}),shape=r=>({...r,objectid:r.objectid,data_source:r.data_source||"recorded",...(r.__g?{geometry:r.__g}:{})});
  if(b.action==="me")return j({username:"admin1",fullName:"Test Admin",isAdmin:true,role:"admin",stations:[]});
@@ -59,48 +59,19 @@ const fit1=await p.evaluate(()=>window.__fit||0);await p.click("#fclr");await p.
 await p.click("#ptoggle");ok(await p.evaluate(()=>document.querySelector("#explorer").classList.contains("shut")),"the filter panel can be hidden to leave a fully clean map");await p.click("#ptoggle");
 // live-empty portal tables → empty chain, honest empty state
 await p.click('[data-tab="delivery"]');ok((await p.textContent("#list")).includes("Nothing here yet"),"deliveries tab shows an honest empty state when nothing is recorded");
-// ---- questionnaire: register a farmer and WALK a boundary with a mocked GPS ----
-const gps=async(lat,lng,acc=6)=>{await ctx.setGeolocation({latitude:lat,longitude:lng,accuracy:acc});await p.waitForTimeout(250)};
-await p.click("#recbtn");ok(await p.locator('#recmenu [data-new="farm_recorded"]').count()===1,"the Record menu offers “Register a farmer & map their farms”");
-await p.click('[data-new="farm_recorded"]');await p.waitForSelector("#qf");
-await p.fill('[data-k="national_id"]',"1198880000000000");await p.click("#qf .row button:not(.ghost)");ok(await p.isVisible('#qf [data-k="farmer_name"]'),"a new National ID continues to the farmer step");
-await p.fill('[data-k="farmer_name"]',"Mukamana Alice");await p.fill('[data-k="phone"]',"788123456");await p.fill('[data-k="province"]',"Eastern Province");await p.fill('[data-k="district"]',"Gatsibo");await p.fill('[data-k="sector"]',"S0");await p.fill('[data-k="cell"]',"c");await p.fill('[data-k="village"]',"v1");
-await p.fill('[data-k="farmer_id"]',"12345");await p.click("#qf .row button:not(.ghost)");ok((await p.textContent('[data-fk="farmer_id"] .ferr')).includes("12 digits"),"a farmer ID must have 12 digits");
-await p.fill('[data-k="farmer_id"]',"530904080999");await p.click("#qf .row button:not(.ghost)");await p.waitForSelector("#qwalk");
-await p.click("#qf .row button:not(.ghost)");ok((await p.textContent("#qerr")).length>0,"a farm cannot be saved without its answers and a boundary");
-for(const[k,v]of Object.entries({upi:"123",land_acquisition:"Inherited",first_planting_year:"2015",last_planting_year:"2018",trees_total:"120",farmer_prod_kg_2024:"100",farmer_prod_kg_2025:"120"}))await p.fill(`#qf [data-k="${k}"]`,v);
-for(const k of["land_registered","registered_to_farmer","land_dispute","coffee_species","hires_workers","prior_land_use"]){const o=await p.locator(`#qf select[data-k="${k}"] option`).allTextContents();await p.selectOption(`#qf select[data-k="${k}"]`,{index:k==="hires_workers"?2:1})}
-await p.waitForTimeout(200);
-ok(await p.locator('#qf [data-k="worker_age_category"]').count()===0,"worker questions stay hidden when the farm does not hire workers");
-await p.click("#gcorner");ok((await p.textContent("#gstat")).includes("0 points"),"a corner is not added before there is a GPS fix");
-// four corners of a ~20 m plot
-const C=[[-1.7000,30.3000],[-1.7000,30.30018],[-1.69982,30.30018],[-1.69982,30.3000]];
-for(const[la,lo]of C){await gps(la,lo);await p.click("#gcorner")}
-await gps(-1.70,30.30,60);await p.click("#gcorner");ok((await p.textContent("#gstat")).includes("4 points"),"a corner tapped with weak GPS (±60 m) is refused");
-ok((await p.textContent("#gstat")).match(/0\.0[34]\d* ha/)!==null,"the plot area is computed from the walked points: "+(await p.textContent("#gstat")).replace(/\s+/g," ").slice(0,60));
-ok(await p.isVisible("#qscreen"),"the EUDR pre-screen result is shown before saving");
-await p.click("#qf .row button:not(.ghost)");await p.waitForTimeout(300);if(!(await p.isVisible("#qsave"))){console.log("  DEBUG qerr:",await p.textContent("#qerr"),"| field errors:",await p.evaluate(()=>[...document.querySelectorAll("#qf .ferr")].map(e=>e.textContent&&e.parentElement.dataset.fk+": "+e.textContent).filter(Boolean)))}await p.waitForSelector("#qsave");ok((await p.textContent("#qf")).includes("Mukamana Alice"),"the review step summarises the farmer and farm");
-await p.click("#qsave");await p.waitForFunction(()=>!document.querySelector("#modal").open,null,{timeout:6000});
-const row=TABLES.farm_recorded?.rows[0];ok(!!row&&row.plot_id==="53090408099901","the plot id is the farmer id + 01: "+row?.plot_id);
-ok(row?.data_source==="recorded"&&!row.farmer_name&&!row.national_id&&row.gps_points===4,"the saved row is Recorded, holds no personal data and keeps the GPS point count");
-const ring=row?.__g?.rings?.[0]||[];ok(ring.length===5&&ring[0][0]===ring.at(-1)[0]&&ring[0][1]===ring.at(-1)[1],"the stored polygon is closed (5 vertices for 4 corners)");
-const sa=ring.slice(0,-1).reduce((s,q,i,a)=>{const n=a[(i+1)%a.length];return s+(n[0]-q[0])*(n[1]+q[1])},0);ok(sa>0,"the stored ring is clockwise (the ArcGIS rule)");
-await p.waitForFunction(()=>__eudr.T.farmById["53090408099901"],null,{timeout:6000}).catch(()=>{});
-ok(await p.evaluate(()=>!!__eudr.T.farmById["53090408099901"]&&__eudr.T.farmById["53090408099901"].src==="recorded"),"the recorded farm is in the chain as a Recorded farm");
-await p.click('[data-tab="plot"]');await p.fill("#q","53090408099901");ok((await p.textContent("#list")).includes("Recorded"),"it appears in the Farms list tagged Recorded");await p.fill("#q","");
-// same National ID again → no duplicate farmer
-await p.click("#recbtn");await p.click('[data-new="farm_recorded"]');await p.waitForSelector("#qf");await p.fill('[data-k="national_id"]',"1198880000000000");await p.click("#qf .row button:not(.ghost)");
-ok((await p.textContent("#found")).includes("already registered"),"the same National ID is recognised: add a farm to the existing farmer, no duplicate");await p.click("#qcancel");
-// washing station: capture the location with GPS
-await p.click("#recbtn");await p.click('[data-new="station_recorded"]');await p.waitForSelector("#mf");
-for(const[k,v]of Object.entries({cws_name:"Test Mapped CWS",district:"Gatsibo",sector:"S0",cell:"c",village:"v",year_of_es:"2020",processing:"500"}))await p.fill(`#mf [data-k="${k}"]`,v);
-await p.selectOption('#mf [data-k="type_of_ow"]',{index:1});await p.click("#useGps");for(let i=0;i<7;i++)await gps(-1.7+i*1e-6,30.3+i*1e-6,8);
-await p.waitForFunction(()=>document.querySelector('#mf [data-k="__lat"]').value!=="",null,{timeout:4000});ok((await p.textContent("#gpsmsg")).includes("Location set"),"the station's location is set from averaged GPS fixes");
-await p.click("#msave");await p.waitForFunction(()=>!document.querySelector("#modal").open,null,{timeout:5000}).catch(()=>{});
-ok(TABLES.station_recorded?.rows[0]?.name_of_cw==="Test Mapped CWS"&&TABLES.station_recorded.rows[0].x_coordina>30,"the station is saved with its coordinates, and the layer's duplicate name field is filled");
-ok(await p.evaluate(()=>Object.values(__eudr.T.stations).some(s=>s.name==="Test Mapped CWS"&&s.src==="recorded")),"the new washing station is on the map as Recorded");
+// ---- read-only National-ID lookup; recorded farm/CWS forms are disabled ----
+await p.click("#recbtn");
+ok(await p.locator('#recmenu [data-new="find_farmer"]').count()===1,"the Record menu offers the read-only Portal farmer lookup");
+ok(await p.locator('#recmenu [data-new="farm_recorded"]').count()===0&&await p.locator('#recmenu [data-new="station_recorded"]').count()===0,"recorded farm and CWS forms are hidden");
+await p.click('[data-new="find_farmer"]');await p.waitForSelector("#qf");
+await p.fill('[data-k="national_id"]',"1199880000000000");await p.click("#qf .row button:not(.ghost)");
+await p.waitForFunction(()=>document.querySelector("#found")?.textContent.includes("Farmer Name"),null,{timeout:6000});
+ok((await p.textContent("#found")).includes("Farmer Name 0"),"National ID lookup finds the farmer in the Portal farms layer");
+ok((await p.textContent("#found")).includes("Read only"),"the lookup says nothing is saved");
+ok(await p.evaluate(()=>!Object.keys(TABLES).some(k=>/farm_recorded|station_recorded|cws_recorded/.test(k))),"the lookup writes no farm or CWS records");
+await p.click("#qcancel");
 const polyBefore=await p.evaluate(()=>window.__poly);
-// ---- recording against the (fake) portal tables, exactly the path your portal uses ----
+// ---- recording chain records through the single fake data service ----
 await p.click("#recbtn");await p.click('[data-new="exporter"]');await p.waitForSelector("#mf");await p.fill('[data-k="name"]',"Live Test Exporter");await p.fill('[data-k="licence_no"]',"LIVE-001");await p.click("#msave");
 await p.waitForFunction(()=>!document.querySelector("#modal").open,null,{timeout:5000}).catch(()=>{});const liveErr=await p.textContent("#merr");ok(!(await p.evaluate(()=>document.querySelector("#modal").open)),"LIVE: saving an exporter closes the form"+(liveErr?" — error shown: "+liveErr:""));
 await p.click('[data-tab="exporter"]');ok((await p.textContent("#list")).includes("Live Test Exporter"),"LIVE: the saved exporter appears in the list, tagged Recorded");

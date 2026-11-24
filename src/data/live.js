@@ -1,15 +1,23 @@
-// Farms and washing stations come from the de-identified Supabase mirror of the ArcGIS layers.
-// Personal lookups are the one exception: they go straight to the Portal with the signed-in user's token.
+// Real farms, farmers and washing stations stay in ArcGIS Portal. The app reads them directly with
+// the signed-in Portal token; Supabase holds only chain records.
 import {CFG} from "../config.js";
-import {req,sb} from "./http.js";
+import {req} from "./http.js";
 import {demoBase} from "./demo.js";
 import {classify} from "../landuse.js";
 const PROV={South:"Southern",West:"Western",East:"Eastern",North:"Northern"};
 
+async function layerFeatures(url){
+  const meta=await req(url),page=Math.min(meta.maxRecordCount||1000,1000),features=[];
+  for(let o=0;;o+=page){
+    const d=await req(url+"/query",{where:"1=1",outFields:"*",returnGeometry:true,outSR:4326,resultOffset:o,resultRecordCount:page});
+    features.push(...(d.features||[]));
+    if(!d.exceededTransferLimit&&(d.features||[]).length<page)break}
+  return{features,fields:(meta.fields||[]).map(f=>f.name)}}
+
 export async function loadCWS(){
   if(CFG.OFFLINE_DEMO)return(await demoBase()).stations.map(s=>({...s}));
-  const s=await sb({action:"sources"});
-  return(s.stations||[]).map(({attributes:a,geometry:g})=>({type:"station",id:String(a.cws_uid||a.globalid||"").replace(/[{}]/g,"").toLowerCase(),name:(a.cws_name||a.name_of_cw||"").trim(),owner:"",
+  const{features}=await layerFeatures(CFG.CWS_URL);
+  return features.map(({attributes:a,geometry:g})=>({type:"station",id:String(a.cws_uid||a.globalid||"").replace(/[{}]/g,"").toLowerCase(),name:(a.cws_name||a.name_of_cw||"").trim(),owner:"",
     ownership:a.type_of_ownership||a.type_of_ow,province:PROV[a.province]||a.province,district:a.district,sector:a.sector,cell:a.cell,village:a.village,capacity_mt:a.processing_capacity,year:a.year_of_establishment>1900?a.year_of_establishment:null,
     phone:"",email:"",src:"live",lat:a.y_coordinate??g?.y,lng:a.x_coordinate??g?.x})).filter(s=>s.lat&&s.lng)}
 
@@ -55,8 +63,8 @@ export async function loadFarms(onProgress=()=>{}){
     for(const f of rows){const lu=classify(f.prior);if(lu.cls==="unknown"&&lu.text){const k=lu.text.toLowerCase();farmInfo.unknownUse[k]=(farmInfo.unknownUse[k]||0)+1}}
     onProgress(rows.length,rows.length);
     return rows.map(f=>({...f}))}
-  const s=await sb({action:"sources"}),rows=s.farms||[],names=s.farmFields||[];
-  cf(s,rows,names);const fields=(names.length?names:Object.keys(rows[0]?.attributes||{}));
+  const{features:rows,fields:names}=await layerFeatures(await farmsUrl());
+  cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=(names.length?names:Object.keys(rows[0]?.attributes||{}));
   const seen=new Map();
   for(const f of rows){const a=f.attributes;if(a.plot_id==null)continue;
     const lu=classify(a.prior_land_use);if(lu.cls==="unknown"&&lu.text)farmInfo.unknownUse[lu.text.toLowerCase()]=(farmInfo.unknownUse[lu.text.toLowerCase()]||0)+1;
@@ -77,4 +85,4 @@ export function recordedFarm(r){const ring=r.geometry?.rings?.[0]?.map(p=>[p[1],
   return{type:"plot",src:"recorded",id:String(r.plot_id),fm:String(r.farmer_id),nm:String(r.farmer_id||""),nid:"",phone:"",prov:r.province,coop:r.cooperative_name||"",stn:r.station_id||"",district:r.district,sec:r.sector,cell:r.cell,village:r.village,
     ha:r.area_ha||0,trees:r.trees_total,kg:r.farmer_prod_kg_2025,prior:r.prior_land_use,first:r.first_planting_year,conv:null,sp:r.coffee_species,reg:r.land_registered,ch:r.sale_channel,eudr,why,ring:n,t,day:t?new Date(t).toISOString().slice(0,10):"",
     c:[n.reduce((a,p)=>a+p[0],0)/n.length,n.reduce((a,p)=>a+p[1],0)/n.length]}}
-export async function layerMetas(){if(CFG.OFFLINE_DEMO)return{farms:{fields:[]},stations:{fields:[]}};const m=await sb({action:"meta"});return{farms:m.farmMeta||{},stations:m.stationMeta||{}}}
+export async function layerMetas(){if(CFG.OFFLINE_DEMO)return{farms:{fields:[]},stations:{fields:[]}};const[f,st]=await Promise.all([req(await farmsUrl()),req(CFG.CWS_URL)]);return{farms:f,stations:st}}

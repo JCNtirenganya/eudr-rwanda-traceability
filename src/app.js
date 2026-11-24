@@ -54,7 +54,7 @@ function setView(v,first){S.view=v;$$(".view").forEach(e=>e.classList.toggle("on
 function renderOverview(){const sc=scope(),fs=sc.farms,c={low:0,review:0,blocked:0};fs.forEach(f=>c[f.eudr]++);const n=fs.length||1;
   $("#ovnote").textContent=sc.active?"For your current focus (change it on the Map).":"For the whole network.";$("#kpis").innerHTML=kpiHTML(sc);$("#timeline").innerHTML=timelineHTML();
   $("#riskbar").innerHTML=`<div class="rbar">${["low","review","blocked"].map(k=>`<i style="width:${100*c[k]/n}%;background:${COL[k]}" title="${LBL[k]}"></i>`).join("")}</div>${["low","review","blocked"].map(k=>`<div class="dline"><span><i class="dot" style="background:${COL[k]};display:inline-block"></i> ${LBL[k]}</span><b>${N(c[k])} <span class="muted">(${fs.length?Math.round(100*c[k]/n):0}%)</span></b></div>`).join("")}<p class="muted small">Pre-screening, not a legal EUDR determination.</p>`;
-  $("#dstat").innerHTML=status().map(x=>`<div class="dline"><span>${esc(x.name)}</span><span>${x.mode==="demo"?'<span class="tag indicative">Demo</span>':'<span class="tag real">Supabase</span>'}</span></div>`).join("")}
+  $("#dstat").innerHTML=status().map(x=>`<div class="dline"><span>${esc(x.name)}</span><span>${x.mode==="demo"?'<span class="tag indicative">Demo</span>':x.mode==="disabled"?'<span class="tag">Portal only</span>':'<span class="tag real">Supabase</span>'}</span></div>`).join("")}
 function render(){
   if(!T.built)return;banner();const v=S.view;
   if(v==="overview")renderOverview();else if(v==="map"){renderPanels();paint()}else if(v==="graph")renderGraph();else if(v==="registry"){renderRegistry();$("#radd").hidden=!REGMODEL(S.rtab)}else if(v==="report")renderReportView();else if(v==="admin")renderAdmin();
@@ -72,7 +72,7 @@ onChange(()=>{if(lastInd!==S.showInd)rebuildTrace();else render();const g=sig();
 hooks.refresh=rebuildTrace;hooks.center=mapCenter;
 const REGMODEL=t=>addFor(t);
 $("#recbtn").onclick=e=>{e.stopPropagation();const m=newMenu(),el=$("#recmenu");el.innerHTML=m.length?m.map(([id,l])=>`<button data-new="${id}">${l}</button>`).join(""):'<p class="muted pad">Your account can view data but not record it. Ask an admin for access.</p>';el.hidden=!el.hidden};
-document.addEventListener("click",e=>{const n=e.target.closest("[data-new]");if(n){$("#recmenu").hidden=true;n.dataset.new==="farm_recorded"?openFarmerQuestionnaire():openForm(n.dataset.new)}else if(!e.target.closest(".menuwrap"))$("#recmenu").hidden=true;
+document.addEventListener("click",e=>{const n=e.target.closest("[data-new]");if(n){$("#recmenu").hidden=true;n.dataset.new==="find_farmer"?openFarmerQuestionnaire():openForm(n.dataset.new)}else if(!e.target.closest(".menuwrap"))$("#recmenu").hidden=true;
   if(e.target.id==="radd"){const mid=REGMODEL(S.rtab);mid&&openForm(mid)}
   if(e.target.id==="dedit")startEdit(S.sel.type,S.sel.id);if(e.target.id==="ddel")removeRecord(S.sel.type,S.sel.id).then(()=>change({sel:null}))});
 document.addEventListener("click",async e=>{if(CFG.OFFLINE_DEMO)return;if(e.target.id==="bnLive"){e.preventDefault();const{setBackend}=await import("./data/index.js");for(const id of["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"])await setBackend(id,"auto");toast("Back to live data");await ctx.reload()}});

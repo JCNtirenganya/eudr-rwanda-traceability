@@ -93,9 +93,11 @@ await t("price floor is 800 RWF/kg: 799 warns, 800 and 1200 do not",async()=>{co
      if(b.action==="count")return j({ok:true,value:{count:0}});
      return j({ok:true,value:b.action==="list"?[]:null})}
    if(s.includes("community/self")){selfCalls++;return j({username:"u",fullName:"U",role:"org_admin"})}return j({})};
- const {Data,init}=await import("../src/data/index.js");
+ const {Data,DISABLED,init}=await import("../src/data/index.js");
  await init({farms,stations:stations.map(s=>({...s,type:"station"})),fetchSeed:async()=>seed});
-  await t("offline demo opens with Portal identity and no Supabase calls",()=>{assert.equal(apiCalls,0);assert.ok(selfCalls>=1);assert.equal(Data.me.username,"u");assert.equal(Data.me.fullName,"U");assert.equal(Data.me.isAdmin,true);assert.ok(Object.values(Data.raw).every(r=>r.kind==="demo"))});
+  await t("offline demo opens with Portal identity and no Supabase calls",()=>{assert.equal(apiCalls,0);assert.ok(selfCalls>=1);assert.equal(Data.me.username,"u");assert.equal(Data.me.fullName,"U");assert.equal(Data.me.isAdmin,true);assert.ok(Object.entries(Data.raw).filter(([id])=>!DISABLED.has(id)).every(([,r])=>r.kind==="demo"));
+     assert.ok(Object.entries(Data.raw).filter(([id])=>DISABLED.has(id)).every(([,r])=>r.kind==="disabled"))});
+  await t("disabled support tables cannot be written",async()=>{for(const id of DISABLED){const r=Data.repo(id);if(r)await assert.rejects(r.create({}),/not allowed|disabled/)}});
  await t("registry: lot–delivery and batch–lot demo links are non-empty and consistent",async()=>{
    const nd=await Data.repo("cherry_delivery").count(),nl=await Data.repo("lot").count(),ld=await Data.repo("lot_delivery").list(),bl=await Data.repo("batch_lot").list(),nb=await Data.repo("export_batch").count();
    assert.ok(nd>0&&nl>0&&nb>0);assert.equal(ld.length,nd,"one link per delivery");assert.ok(bl.length>=nb);assert.ok(Object.keys(ld[0]).every(k=>!k.startsWith("_")))});
