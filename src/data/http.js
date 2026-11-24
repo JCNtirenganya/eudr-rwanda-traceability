@@ -1,7 +1,7 @@
 // One place for every request: portal token handling and the Supabase data call.
 import {CFG} from "../config.js";
 export class NetErr extends Error{}
-export class ArcErr extends Error{constructor(e){super(e.message||"ArcGIS error");this.code=e.code;this.details=e.details}}
+export class ArcErr extends Error{constructor(e){const d=Array.isArray(e.details)?e.details.filter(Boolean):[e.details].filter(Boolean);super([e.message||"ArcGIS error",...d].join(" — "));this.code=e.code;this.details=e.details}}
 const SS=globalThis.sessionStorage;let expiredHandler=null;
 export const onExpired=f=>expiredHandler=f;
 export const token=()=>SS&&Date.now()<+SS.getItem("tkExp")?SS.getItem("tk"):null;
@@ -33,6 +33,11 @@ export async function req(url,params={},{post=false,retry=true,attempt=0}={}){
   if(!r.ok)throw new Error(`NAEB server answered HTTP ${r.status} for …/${where(url)}${r.status===504?" (the server took too long)":""}`);
   const d=await r.json();
   if(d.error){if([498,499].includes(d.error.code)&&retry&&expiredHandler){await expiredHandler();return req(url,params,{post,retry:false,attempt})}throw new ArcErr(d.error)}
+  return d}
+// Identity helper: the Portal is the login, so the browser can read the signed-in account directly.
+export async function portalMe(){
+  const d=await req(`${CFG.PORTAL}/sharing/rest/community/self`);
+  if(!d.username)throw new Error("Portal did not return your account details.");
   return d}
 export async function signIn(portal,user,pass){
   const r=await fetch(`${portal}/sharing/rest/generateToken`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({username:user,password:pass,client:"referer",referer:location.origin,expiration:"120",f:"json"})}).catch(()=>{throw new NetErr("Cannot reach the portal (network or CORS).")});

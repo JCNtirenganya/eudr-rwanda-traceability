@@ -5,6 +5,22 @@ Run locally with `python -m http.server` → http://localhost:8000 · Deploy: pu
 
 Repo: https://github.com/JCNtirenganya/eudr-rwanda-traceability · Site: https://jcntirenganya.github.io/eudr-rwanda-traceability/
 
+## Temporary offline demo (current state)
+
+`CFG.OFFLINE_DEMO` in `src/config.js` is currently `true`. Portal sign-in is still required; after a
+successful Portal token the app opens with indicative farms, washing stations and supply-chain records
+generated locally in the browser. It does **not** call Supabase, and anything recorded in this mode is
+not saved. A banner says this after sign-in. This exists only so the deployed link can open while
+Supabase is being configured.
+
+Set `CFG.OFFLINE_DEMO` to `false` after the schema, Edge Function and secrets below are ready. Then
+sign-in continues to work exactly the same way, but farms/CWS and records come from Supabase and saves
+are permanent.
+
+If sign-in still fails, the message now includes Portal's own detail (for example, `Invalid username
+or password`). Use the exact Portal username, not an email address unless that email is the username.
+You can confirm it by signing in at https://gis.naeb.gov.rw/portal directly.
+
 ## Architecture
 
 ```

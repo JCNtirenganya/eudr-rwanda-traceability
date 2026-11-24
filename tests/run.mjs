@@ -6,6 +6,9 @@ const seed=JSON.parse(fs.readFileSync("models/seed.json"));
 const S=await import("../src/engine/schema.js");const {ArcGISRepo}=await import("../src/data/arcgis.js");
 let ok=0;const t=(n,f)=>Promise.resolve(f()).then(()=>{ok++;console.log("✓",n)},e=>{console.log("✗",n,"\n ",e.message);process.exitCode=1});
 
+await t("sign-in errors show Portal detail, not just a generic message",async()=>{const {ArcErr}=await import("../src/data/http.js");
+  const e=new ArcErr({message:"Unable to generate token.",details:["Invalid username or password."]});assert.match(e.message,/Invalid username or password/)});
+
 await t("every seed model validates",()=>{const ids=seed.models.map(m=>m.id);for(const m of [...seed.models,...seed.system])assert.deepEqual(S.validateModel(m,ids),[],m.id)});
 await t("ArcGIS fields: choice gets coded domain, bool 0/1, tracking fields added",()=>{const m=seed.models[0],f=S.toArcFields(m),g=f.find(x=>x.name==="grade");
   assert.equal(g.domain.type,"codedValue");assert.ok(f.some(x=>x.name==="created_date")&&f.some(x=>x.name==="is_deleted"));assert.equal(f.find(x=>x.name==="weight_kg").type,"esriFieldTypeDouble")});
@@ -50,6 +53,11 @@ await t("demo chain: deliveries → lots → batches are consistent and indicati
   assert.ok(ld.every(x=>dids.has(x.delivery_id)&&lids.has(x.lot_id)));assert.ok(bl.every(x=>lids.has(x.lot_id)&&bids.has(x.batch_id)));
   const sumLot=Object.fromEntries(l.map(x=>[x.lot_id,x.cherry_kg_in]));const got={};ld.forEach(x=>got[x.lot_id]=(got[x.lot_id]||0)+x.kg_allocated);
   for(const k in sumLot)assert.ok(Math.abs(sumLot[k]-got[k])<d.length,"lot kg ≈ allocated deliveries "+k)});
+await t("offline demo base supplies indicative farms and stations",async()=>{const {demoBase}=await import("../src/data/demo.js"),b=await demoBase();
+  assert.ok(b.farms.length>=100&&b.stations.length>=20);assert.equal(await demoBase(),b,"base is cached");
+  assert.ok(b.farms.every(f=>f.type==="plot"&&f.src==="indicative"&&f.ring.length>=4&&f.eudr));
+  assert.ok(b.stations.every(s=>s.type==="station"&&s.src==="indicative"&&s.lat&&s.lng));
+  for(const r of["low","review","blocked"])assert.ok(b.farms.some(f=>f.eudr===r),r)});
 console.log(`\n${ok} checks passed`);
 
 await t("audit log never receives personal fields",async()=>{const {redact}=await import("../src/data/index.js");const fm=seed.models.find(x=>x.id==="farmer_recorded");
@@ -77,16 +85,17 @@ await t("price floor is 800 RWF/kg: 799 warns, 800 and 1200 do not",async()=>{co
 // ---- regression: link models must be non-empty when read through the real Data registry (demo mode) ----
 {const mem=()=>({_:{},getItem(k){return this._[k]??null},setItem(k,v){this._[k]=String(v)},removeItem(k){delete this._[k]}});globalThis.localStorage=mem();
  localStorage.setItem("eudr.backend",JSON.stringify(Object.fromEntries(["cherry_delivery","lot","lot_delivery","export_batch","batch_lot"].map(x=>[x,"demo"]))));
- const real=globalThis.fetch;const j=o=>({ok:true,status:200,json:async()=>o});
+ const real=globalThis.fetch;const j=o=>({ok:true,status:200,json:async()=>o});const {CFG}=await import("../src/config.js");CFG.OFFLINE_DEMO=true;let apiCalls=0,selfCalls=0;
  globalThis.fetch=async(u,opt)=>{const s=String(u);
-   if(s.includes("functions/v1/api")){const b=JSON.parse(opt.body);
+   if(s.includes("functions/v1/api")){apiCalls++;const b=JSON.parse(opt.body);
      if(b.action==="me")return j({ok:true,value:{username:"u",fullName:"U",isAdmin:true,role:"admin",stations:[]}});
      if(b.action==="meta")return j({ok:true,value:{farmMeta:{fields:[]},stationMeta:{fields:[]},convField:""}});
      if(b.action==="count")return j({ok:true,value:{count:0}});
      return j({ok:true,value:b.action==="list"?[]:null})}
-   if(s.includes("community/self"))return j({username:"u",role:"org_admin"});return j({})};
+   if(s.includes("community/self")){selfCalls++;return j({username:"u",fullName:"U",role:"org_admin"})}return j({})};
  const {Data,init}=await import("../src/data/index.js");
  await init({farms,stations:stations.map(s=>({...s,type:"station"})),fetchSeed:async()=>seed});
+  await t("offline demo opens with Portal identity and no Supabase calls",()=>{assert.equal(apiCalls,0);assert.ok(selfCalls>=1);assert.equal(Data.me.username,"u");assert.equal(Data.me.fullName,"U");assert.equal(Data.me.isAdmin,true);assert.ok(Object.values(Data.raw).every(r=>r.kind==="demo"))});
  await t("registry: lot–delivery and batch–lot demo links are non-empty and consistent",async()=>{
    const nd=await Data.repo("cherry_delivery").count(),nl=await Data.repo("lot").count(),ld=await Data.repo("lot_delivery").list(),bl=await Data.repo("batch_lot").list(),nb=await Data.repo("export_batch").count();
    assert.ok(nd>0&&nl>0&&nb>0);assert.equal(ld.length,nd,"one link per delivery");assert.ok(bl.length>=nb);assert.ok(Object.keys(ld[0]).every(k=>!k.startsWith("_")))});

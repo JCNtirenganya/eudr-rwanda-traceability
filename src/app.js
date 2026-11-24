@@ -35,7 +35,7 @@ const valid=({type,id})=>!!({plot:T.farmById,farmer:T.plotsOf,station:T.stations
 async function start(){
   $("#splash").hidden=true;$("#app").hidden=false;$("#rail").hidden=false;readHash();
   try{stations=await loadCWS();await init({farms:[],stations});}
-  catch(e){$("#splash").hidden=false;$("#app").hidden=true;$("#rail").hidden=true;$("#smsg").textContent="Stations: "+e.message;$("#sgo").disabled=false;return}
+  catch(e){$("#splash").hidden=false;$("#app").hidden=true;$("#rail").hidden=true;$("#smsg").textContent=(CFG.OFFLINE_DEMO?"Could not open the demo: ":"Stations: ")+e.message;$("#sgo").disabled=false;return}
   $("#whoami").textContent=`${Data.me.fullName} · ${Data.me.role}`;$("#browse").open=localStorage.getItem("eudr.browse")==="1";initMap();await rebuildTrace();setView(S.view,true);
   loadFarmsInBackground()}
 async function loadFarmsInBackground(){
@@ -43,8 +43,10 @@ async function loadFarmsInBackground(){
   catch(e){$("#src").innerHTML=`⚠ Farm polygons did not load: ${esc(e.message)} <button class="ghost" id="retryFarms">Retry</button>`;$("#retryFarms").onclick=loadFarmsInBackground}}
 ctx.reload=async()=>{await init({farms,stations});await rebuildTrace()};
 const banner=()=>{const dm=status().filter(x=>x.mode==="demo"&&["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"].includes(x.id)),bn=$("#banner");
-  bn.hidden=!dm.length;bn.innerHTML=dm.length?`<b>Demo data is switched on in this browser</b> for ${dm.length} model(s). Anything you record on them is <b>not saved</b> and is labelled Indicative. <a href="#" id="bnLive">Switch to live data</a>`:"";const st=status(),demo=st.filter(s=>s.mode==="demo").length;$("#src").innerHTML=`<span class="dotlive"></span> ${N(farms.length)} farm polygons · ${stations.length} stations`;
-  $("#dpill").innerHTML=demo?`<span class="tag indicative">${demo} of ${st.length} models on demo</span>`:`<span class="tag real">all models live</span>`;$("#dpill").title="Data status — open Admin for details"};
+  if(CFG.OFFLINE_DEMO){bn.hidden=false;bn.innerHTML="<b>Temporary offline demo</b> Portal sign-in succeeded; Supabase is not connected yet, so the app is showing indicative farms, CWS and records. Anything you record here is <b>not saved</b>."}
+  else{bn.hidden=!dm.length;bn.innerHTML=dm.length?`<b>Demo data is switched on in this browser</b> for ${dm.length} model(s). Anything you record on them is <b>not saved</b> and is labelled Indicative. <a href="#" id="bnLive">Switch to live data</a>`:""}
+  const st=status(),demo=st.filter(s=>s.mode==="demo").length;$("#src").innerHTML=`<span class="dotlive"></span> ${N(farms.length)} farm polygons · ${stations.length} stations`;
+  $("#dpill").innerHTML=CFG.OFFLINE_DEMO?`<span class="tag indicative">offline demo</span>`:demo?`<span class="tag indicative">${demo} of ${st.length} models on demo</span>`:`<span class="tag real">all models live</span>`;$("#dpill").title="Data status — open Admin for details"};
 
 // ---- views ----
 function setView(v,first){S.view=v;$$(".view").forEach(e=>e.classList.toggle("on",e.id==="v-"+v));$$("#navs button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
@@ -73,7 +75,7 @@ $("#recbtn").onclick=e=>{e.stopPropagation();const m=newMenu(),el=$("#recmenu");
 document.addEventListener("click",e=>{const n=e.target.closest("[data-new]");if(n){$("#recmenu").hidden=true;n.dataset.new==="farm_recorded"?openFarmerQuestionnaire():openForm(n.dataset.new)}else if(!e.target.closest(".menuwrap"))$("#recmenu").hidden=true;
   if(e.target.id==="radd"){const mid=REGMODEL(S.rtab);mid&&openForm(mid)}
   if(e.target.id==="dedit")startEdit(S.sel.type,S.sel.id);if(e.target.id==="ddel")removeRecord(S.sel.type,S.sel.id).then(()=>change({sel:null}))});
-document.addEventListener("click",async e=>{if(e.target.id==="bnLive"){e.preventDefault();const{setBackend}=await import("./data/index.js");for(const id of["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"])await setBackend(id,"auto");toast("Back to live data");await ctx.reload()}});
+document.addEventListener("click",async e=>{if(CFG.OFFLINE_DEMO)return;if(e.target.id==="bnLive"){e.preventDefault();const{setBackend}=await import("./data/index.js");for(const id of["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"])await setBackend(id,"auto");toast("Back to live data");await ctx.reload()}});
 // Nothing fails silently: any unexpected error is shown, with detail you can send.
 const oops=m=>{console.error(m);toast("Something went wrong: "+String(m?.message||m).slice(0,140))};
 addEventListener("error",e=>oops(e.error||e.message));addEventListener("unhandledrejection",e=>oops(e.reason));

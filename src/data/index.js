@@ -1,5 +1,6 @@
 // The one door to data. UI code calls Data.repo("cherry_delivery").list() and never knows where records live.
-import {sb} from "./http.js";
+import {CFG} from "../config.js";
+import {sb,portalMe} from "./http.js";
 import {SupabaseRepo} from "./supabase.js";
 import {DemoRepo,GEN} from "./demo.js";
 import {modelFromLayer,FARM,STATION} from "../layermodel.js";
@@ -10,7 +11,12 @@ const LINK_PARENTS={lot_delivery:["lot","cherry_delivery"],batch_lot:["export_ba
 // Identity stays in ArcGIS. These fields are shown in the questionnaire but never stored by the app.
 const NO_SYNC=new Set(["farmer_name","national_id","phone","telephone","f_email","owner_name"]);
 
-export async function whoAmI(){return sb({action:"me"})}
+// Identity always comes from Portal. In offline-demo mode we skip the Supabase identity call
+// because the Edge Function is not deployed yet; the Portal token is still mandatory.
+export async function whoAmI(){
+  if(!CFG.OFFLINE_DEMO)return sb({action:"me"});
+  const m=await portalMe(),isAdmin=m.role==="org_admin"||m.username===CFG.OWNER;
+  return{username:m.username,fullName:m.fullName||m.username,portalRole:m.role,isAdmin,role:isAdmin?"admin":"viewer",stations:[]}}
 
 function questionnaireModels(meta){
   const out={};
@@ -31,8 +37,13 @@ export async function init({farms,stations,fetchSeed=()=>fetch("models/seed.json
   Data.models=Object.fromEntries(seed.models.map(m=>[m.id,m]));Data.system=Object.fromEntries(seed.system.map(m=>[m.id,m]));
   Data.warnings=[];
   try{Data.backend=JSON.parse(localStorage.getItem("eudr.backend")||"{}")}catch{Data.backend={}}
-  try{Data.ctx.meta=await sb({action:"meta"});Object.assign(Data.models,questionnaireModels(Data.ctx.meta))}
-  catch(e){Data.warnings.push("The recorded-farm questionnaires could not be loaded: "+e.message)}
+  if(CFG.OFFLINE_DEMO){
+    // No Supabase yet: keep the seed models and let the National-ID lookup still go straight to ArcGIS.
+    Data.ctx.meta={convField:"",farmMeta:{fields:[]},stationMeta:{fields:[]},syncedAt:null};
+  }else{
+    try{Data.ctx.meta=await sb({action:"meta"});Object.assign(Data.models,questionnaireModels(Data.ctx.meta))}
+    catch(e){Data.warnings.push("The recorded-farm questionnaires could not be loaded: "+e.message)}
+  }
   Data.all={...Data.models,...Data.system};for(const id of Object.keys(Data.all))build(id);
   Data.me=await whoAmI();
   return Data}
@@ -45,11 +56,12 @@ async function demoRows(id){
 // Backend per model: an explicit demo choice in the browser wins; otherwise Supabase.
 const user=()=>Data.me?.username||"unknown";
 function build(id){
-  const m=Data.all[id],want=Data.backend?.[id]||"supabase";let r;
+  const m=Data.all[id],want=CFG.OFFLINE_DEMO?"demo":(Data.backend?.[id]||"supabase");let r;
   if(want==="demo")r=new DemoRepo(m,()=>demoRows(id));
   else r=new SupabaseRepo(m,user);
   Data.raw[id]=r;Data.repos[id]=guard(m,r)}
 export async function setBackend(id,kind){
+  if(CFG.OFFLINE_DEMO)throw new Error("Offline demo is active; storage can be switched once Supabase is configured.");
   if(!Data.me?.isAdmin)throw new Error("Only admins can change the preview setting.");
   Data.backend??={};if(kind==="demo")Data.backend[id]="demo";else delete Data.backend[id];
   localStorage.setItem("eudr.backend",JSON.stringify(Data.backend));Data.warnings=[];Object.keys(Data.all).forEach(build)}
