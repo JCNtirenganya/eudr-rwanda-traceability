@@ -4,7 +4,7 @@
 export const CFG = {
   PORTAL: "https://gis.naeb.gov.rw/portal",
   CWS_URL: "https://gis.naeb.gov.rw/server/rest/services/Hosted/Coffee_Washing_Station/FeatureServer/0",
-  FARMS_URL: "https://gis.naeb.gov.rw/portal/sharing/servers/63a787f80563400fa9e46af7f006d714/rest/services/EUDR_Data/FeatureServer/0",
+  FARMS_URL: "https://gis.naeb.gov.rw/portal/sharing/servers/63a787f80563400fa9e46af7f006d714/rest/services/EUDR_Data/FeatureServer/0", // preferred; the app discovers the readable polygon layer
   CONVERSION_FIELD: "",          // empty = detect the "converted to farmland" field automatically
   OWNER: "Coffee_Trace",
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",

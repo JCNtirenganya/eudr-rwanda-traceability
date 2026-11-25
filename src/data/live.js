@@ -8,7 +8,15 @@ const pick=(a,names)=>{for(const n of names)if(a[n]!=null&&a[n]!=="")return a[n]
 const PLOT_KEYS=["plot_id","Plot_ID","plotid","PlotID","PlotId","plot_no","Plot_No","parcel_id","Parcel_ID","farm_plot_id","FarmPlotID"];
 const FARMER_KEYS=["farmer_id","Farmer_ID","farmerid","FarmerID","FarmerId","farmer_uid","farmer_code"];
 const NID_KEYS=["national_id","National_ID","nationalid","NationalID","nid","NID","id_number","ID_Number"];
-let nidField="";
+let nidField="",nidLayer="",farmLayerUrl="";
+const unique=a=>[...new Set(a.filter(Boolean))];
+const short=u=>String(u).replace(/^https?:\/\/[^/]+/,"").replace(/\/rest\/services\//,"/");
+const serviceRoot=u=>String(u||"").replace(/\/FeatureServer\/\d+\/?$/i,"/FeatureServer").replace(/\/$/,"");
+const farmRoots=()=>unique([
+  serviceRoot(CFG.FARMS_URL),
+  "https://gis.naeb.gov.rw/server/rest/services/EUDR_Data/FeatureServer",
+  "https://gis.naeb.gov.rw/portal/sharing/servers/63a787f80563400fa9e46af7f006d714/rest/services/EUDR_Data/FeatureServer"
+]);
 function plotKey(a,fields){
   const v=pick(a,PLOT_KEYS);if(v!=null)return String(v);
   const f=(fields||[]).find(n=>/^(plot|parcel)/i.test(n)&&!/farmer/i.test(n));
@@ -24,17 +32,42 @@ async function layerFeatures(url){
     if(!d.exceededTransferLimit&&(d.features||[]).length<page)break}
   return{features,fields:(meta.fields||[]).map(f=>f.name)}}
 
+// The configured sublayer may be a table or may be hidden behind a different Portal/proxy URL.
+// Find the first readable polygon layer once, then every screen uses that same layer.
+async function farmLayer(){
+  if(farmLayerUrl)return farmLayerUrl;
+  const problems=[];
+  for(const root of farmRoots()){
+    let meta;
+    try{meta=await req(root)}
+    catch(e){problems.push(`${short(root)}: ${e.message}`);continue}
+    const layers=meta.layers||[];
+    const preferred=layers.find(l=>`${root}/${l.id}`===CFG.FARMS_URL&&/polygon/i.test(l.geometryType||""));
+    const polygons=layers.filter(l=>/polygon/i.test(l.geometryType||""));
+    const candidates=[...polygons].sort((a,b)=>a===preferred?-1:b===preferred?1:0).concat(meta.fields&&!polygons.length?[{}]:[]);
+    const seen=new Set();
+    for(const l of candidates){
+      if(!l||seen.has(l.id??"root"))continue;seen.add(l.id??"root");
+      const url=l.id!=null?`${root}/${l.id}`:root;
+      try{
+        const probe=await req(url+"/query",{where:"1=1",outFields:"*",returnGeometry:false,resultRecordCount:1});
+        if((probe.features||[]).length){farmLayerUrl=url;farmInfo.source=url;farmInfo.layers=layers.map(x=>`${x.id}:${x.name||""}`);return url}
+        problems.push(`${short(url)}: no rows`)
+      }catch(e){problems.push(`${short(url)}: ${e.message}`)}
+    }
+  }
+  throw new Error(`No readable farm polygon layer. ${problems.slice(0,4).join(" · ")}`)}
+
 export async function loadCWS(){
   const{features}=await layerFeatures(CFG.CWS_URL);
   return features.map(({attributes:a,geometry:g})=>({type:"station",id:String(a.cws_uid||a.globalid||"").replace(/[{}]/g,"").toLowerCase(),name:(a.cws_name||a.name_of_cw||"").trim(),owner:"",
     ownership:a.type_of_ownership||a.type_of_ow,province:PROV[a.province]||a.province,district:a.district,sector:a.sector,cell:a.cell,village:a.village,capacity_mt:a.processing_capacity,year:a.year_of_establishment>1900?a.year_of_establishment:null,
     phone:"",email:"",src:"live",lat:a.y_coordinate??g?.y,lng:a.x_coordinate??g?.x})).filter(s=>s.lat&&s.lng)}
 
-const farmsUrl=()=>CFG.FARMS_URL;
 // Identity fields stay in ArcGIS. The questionnaire uses this with the Portal token the user already has.
 export async function findFarmerByNationalId(nid){
-  const url=farmsUrl(),q=String(nid).trim().replace(/'/g,"''");
-  if(!nidField){const m=await req(url),fields=(m.fields||[]).map(f=>f.name);nidField=NID_KEYS.find(k=>fields.includes(k))||fields.find(n=>/national.?id/i.test(n))||NID_KEYS[0]}
+  const url=await farmLayer(),q=String(nid).trim().replace(/'/g,"''");
+  if(!nidField||nidLayer!==url){const m=await req(url),fields=(m.fields||[]).map(f=>f.name);nidField=NID_KEYS.find(k=>fields.includes(k))||fields.find(n=>/national.?id/i.test(n))||NID_KEYS[0];nidLayer=url}
   const d=await req(url+"/query",{where:`${nidField}='${q}'`,outFields:"*",returnGeometry:false,resultRecordCount:2});
   const a=d.features?.[0]?.attributes;if(!a)return null;
   return{farmer_id:String(pick(a,FARMER_KEYS)||""),farmer_name:a.farmer_name||"",national_id:String(pick(a,NID_KEYS)||nid),phone:String(a.phone||""),province:a.province,district:a.district,
@@ -45,7 +78,7 @@ export async function findFarmerByNationalId(nid){
 // is planted, so conversion can never be LATER than first planting. Hence planted ≤ 2020 proves conversion ≤ 2020, but planted > 2020 proves nothing.
 // Everything is "declared" until the satellite check (deforest_check_*) confirms it. Pre-screening only, not a legal determination.
 const CUTOFF=Date.UTC(2020,11,31,23,59,59);
-export const farmInfo={convField:"",fields:[],unknownUse:{},values:{}};
+export const farmInfo={convField:"",fields:[],unknownUse:{},values:{},source:"",layers:[]};
 const SUGGEST=["land_acquisition","land_dispute","registered_to_farmer","hires_workers","worker_age_category","cooperative_name","sale_channel","land_registered","coffee_species"];
 export function toMs(v){if(v==null||v==="")return null;if(typeof v==="number")return v>1e11?v:(v>=1900&&v<=2100?Date.UTC(v,11,31):null);const t=Date.parse(v);return isNaN(t)?(/^\d{4}$/.test(String(v).trim())?Date.UTC(+v,11,31):null):t}
 export function screen(a,conv){
@@ -65,8 +98,8 @@ function toFarm({attributes:a,geometry:g},cf,id){
     c:ring&&[ring.reduce((s,p)=>s+p[0],0)/ring.length,ring.reduce((s,p)=>s+p[1],0)/ring.length]}}
 
 export async function loadFarms(onProgress=()=>{}){
-  const{features:rows,fields:names}=await layerFeatures(farmsUrl());
-  if(!rows.length)throw new Error("Portal farms layer returned no rows — check EUDR_Data/0 access");
+  const url=await farmLayer(),{features:rows,fields:names}=await layerFeatures(url);
+  if(!rows.length)throw new Error(`Portal farm layer ${short(url)} returned no rows`);
   cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=farmInfo.fields;
   const seen=new Map();
   for(const f of rows){const a=f.attributes,id=plotKey(a,fields);if(id==null)continue;

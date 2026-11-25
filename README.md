@@ -68,7 +68,7 @@ Settings → Pages → Source: **GitHub Actions**. Push to `main` to deploy.
 The app signs in at `https://gis.naeb.gov.rw/portal`. As a Portal org administrator:
 
 1. Organization → Settings → Security → **Allowed Origins** → add `https://jcntirenganya.github.io` and `http://localhost:8000`.
-2. Ensure staff can read the farms service in `CFG.FARMS_URL` and the CWS service in `CFG.CWS_URL`. The app reads them with each user's own token.
+2. Ensure staff can read the farms service in `CFG.FARMS_URL` and the CWS service in `CFG.CWS_URL`. The app reads them with each user's own token. `CFG.FARMS_URL` is a preferred starting point: the app checks the service metadata and uses the first readable polygon sublayer, so a wrong sublayer number does not blank the map.
 3. Leave `CONVERSION_FIELD` empty to auto-detect the conversion-date field, or set the exact field name.
 
 ### GitHub Secrets

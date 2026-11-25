@@ -84,4 +84,25 @@ await t("demo chain opens with Portal identity and no Supabase calls",async()=>{
     const ld=await Data.repo("lot_delivery").list(),bl=await Data.repo("batch_lot").list();
     assert.ok(ld.length>0&&bl.length>0)}finally{globalThis.fetch=real}});
 
+await t("farm loader discovers the polygon layer instead of trusting sublayer 0",async()=>{
+  const real=globalThis.fetch,j=o=>({ok:true,status:200,json:async()=>o});
+  const feat={attributes:{plot_id:"P1",farmer_id:"F1",prior_land_use:"Cropland",first_planting_year:2010,survey_date:Date.now(),OBJECTID:1},geometry:{rings:[[[30,-1],[30.001,-1],[30.001,-1.001],[30,-1]]]}};
+  const fields=[{name:"plot_id"},{name:"farmer_id"},{name:"prior_land_use"},{name:"first_planting_year"}];
+  const seen=[];
+  globalThis.fetch=async(u)=>{
+    const s=String(u),p=new URLSearchParams(new URL(s).search);seen.push(s);
+    if(/\/FeatureServer\/1\/query/.test(s))return j({features:[feat]});
+    if(/\/FeatureServer\/0\/query/.test(s))return j({features:[]});
+    if(/\/FeatureServer\/1(\?|$)/.test(s))return j({fields,maxRecordCount:1000,geometryType:"Polygon"});
+    if(/\/FeatureServer(\?|$)/.test(s))return j({layers:[{id:0,name:"Farmers",geometryType:"Table"},{id:1,name:"Farm plots",geometryType:"Polygon"}]});
+    return j({})};
+  try{
+    const {loadFarms,farmInfo}=await import("../src/data/live.js");
+    const rows=await loadFarms();
+    assert.equal(rows.length,1);assert.equal(rows[0].id,"P1");assert.ok(rows[0].ring);
+    assert.match(farmInfo.source,/\/FeatureServer\/1$/);
+    assert.ok(seen.some(u=>/\/FeatureServer\/1\/query/.test(u)));
+    assert.ok(!seen.some(u=>/\/FeatureServer\/0\/query/.test(u)),"a table sublayer is skipped");
+  }finally{globalThis.fetch=real}});
+
 console.log(`\n${ok} checks passed`);
