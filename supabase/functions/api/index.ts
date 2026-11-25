@@ -64,10 +64,8 @@ const shape = (r: any) => ({
 
 async function handle(body: any, me: any) {
   const { action, model, key } = body ?? {};
-  if (action !== "me" && !CHAIN.has(model)) throw new Error("This table is not stored in Supabase; real farms and CWS stay on the Portal.");
+  if (!CHAIN.has(model)) throw new Error("This table is not stored in Supabase; real farms and CWS stay on the Portal.");
   switch (action) {
-    case "me":
-      return me;
     case "list":
       return (await db(`records?model=eq.${encodeURIComponent(model)}&is_deleted=eq.false&select=*`)).map(shape);
     case "count":

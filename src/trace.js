@@ -8,7 +8,6 @@ export function buildTrace({farms,stations,rows,srcOf={}}){
   T.src={delivery:srcOf.cherry_delivery||"recorded",lot:srcOf.lot||"recorded",batch:srcOf.export_batch||"recorded",exporter:srcOf.exporter||"recorded",importer:srcOf.importer||"recorded",ld:srcOf.lot_delivery||"recorded",bl:srcOf.batch_lot||"recorded"};
   T.farms=farms;T.farmById=by(farms,"id");T.plotsOf={};farms.forEach(f=>add(T.plotsOf,f.fm,f));
   T.stations=Object.fromEntries(stations.map(s=>[s.id,{...s,src:s.src||"live"}]));
-  [...o("cws_recorded"),...o("station_recorded")].forEach(c=>{const g=c.geometry,id=c.cws_uid||c.cws_id;if(g&&id)T.stations[id]={type:"station",id,name:c.cws_name||c.name_of_cw||c.name,lat:g.y,lng:g.x,district:c.district,sector:c.sector,owner:c.owner_name,capacity_mt:c.processing??c.capacity_mt,phone:c.telephone||c.phone,email:c.f_email||c.email,year:c.year_of_es,src:"recorded"}});
   T.sectorStations={};Object.values(T.stations).forEach(s=>add(T.sectorStations,s.district+"|"+s.sector,s.id));
   const del=tagged("cherry_delivery",o("cherry_delivery")),lot=tagged("lot",o("lot")),bat=tagged("export_batch",o("export_batch"));
   T.del=by(del,"delivery_id");T.lot=by(lot,"lot_id");T.bat=by(bat,"batch_id");T.exp=by(tagged("exporter",o("exporter")),"exporter_id");T.imp=by(tagged("importer",o("importer")),"importer_id");

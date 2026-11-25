@@ -29,7 +29,7 @@ await t("update then soft delete hides the record",async()=>{const [r]=await rep
   assert.equal((await repo.list()).length,0);assert.equal(await repo.count(),0)});
 await t("all requests go through the single function with the portal token",()=>assert.ok(calls>6));
 await t("personal fields are not sent even if the form supplies them",async()=>{
-  const fm=structuredClone(seed.models.find(x=>x.id==="farmer_recorded"));fm.fields=fm.fields.filter(f=>!f.pii);
-  const r=new SupabaseRepo(fm,()=>"tester");await r.create({farmer_id:"F1",district:"Kigali",full_name:"Jane",phone:"078"});
-  const row=rows.at(-1);assert.equal(row.model,"farmer_recorded");assert.ok(!("full_name" in row.attrs)&&!("phone" in row.attrs))});
+  await repo.create({name:"No identities",licence_no:"L2",farmer_name:"Jane",phone:"078",national_id:"1199880000000000"});
+  const row=rows.at(-1);assert.equal(row.model,"exporter");
+  assert.ok(!("farmer_name" in row.attrs)&&!("national_id" in row.attrs))});
 console.log(`\n${ok} checks passed`);

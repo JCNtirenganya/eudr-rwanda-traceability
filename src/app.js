@@ -1,8 +1,8 @@
 // App shell: sign-in gate, loading (stations first, farms in the background), navigation, and re-rendering on every change.
 import {CFG} from "./config.js";
 import {signIn,onExpired,clearToken,token} from "./data/http.js";
-import {loadCWS,loadFarms,recordedFarm} from "./data/live.js";
-import {Data,init,status,setFarms} from "./data/index.js";
+import {loadCWS,loadFarms} from "./data/live.js";
+import {Data,CHAIN,init,status,setFarms} from "./data/index.js";
 import {buildTrace,T} from "./trace.js";
 import {S,scope,change,onChange,readHash,select,clearAll,dirty} from "./core.js";
 import {$,$$,esc,toast,ic,N,COL,LBL} from "./ui.js";
@@ -16,7 +16,7 @@ import {renderAdmin,ctx} from "./admin.js";
 import {hooks,newMenu,openForm,removeRecord,startEdit,resetForms,addFor} from "./forms.js";
 import {mapCenter} from "./map.js";
 import {openFarmerQuestionnaire} from "./quest.js";
-let stations=[],farms=[],farmsDone=false,lastInd=true,builtFarms=null,farmError="";
+let stations=[],farms=[],farmsDone=false,lastInd=true,farmError="";
 const NAV=[["overview","Overview","db"],["map","Map","map"],["graph","Network","graph"],["registry","Registry","list"],["report","Reports","file"],["admin","Admin","db"]];
 
 // ---- sign-in gate ----
@@ -27,10 +27,9 @@ $("#sform").onsubmit=async e=>{e.preventDefault();const b=$("#sgo");b.disabled=t
 $("#signout").onclick=()=>{clearToken();location.reload()};
 
 // ---- loading ----
-const rowsFor=async()=>{const rows={},srcOf={};for(const id of["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer","cws_recorded","farm_recorded","station_recorded"]){if(!Data.raw[id])continue;
-  const demo=Data.raw[id].kind==="demo";srcOf[id]=demo?"indicative":"recorded";rows[id]=demo&&!S.showInd?[]:await Data.repo(id).list().catch(()=>[])}return{rows,srcOf}};
-async function rebuildTrace(){const{rows,srcOf}=await rowsFor(),rec=(rows.farm_recorded||[]).map(recordedFarm).filter(Boolean),all=rec.length?farms.concat(rec):farms,fkey=farms.length+":"+rec.length+":"+(rec.at(-1)?.id||"");buildTrace({farms:all,stations,rows,srcOf});dirty();resetSearch();resetForms();
-  if(farmsDone&&S.sel&&!valid(S.sel))S.sel=null;if(mapReady()){if(builtFarms!==fkey){buildFarmLayer();builtFarms=fkey}buildStationLayer()}lastInd=S.showInd;render()}
+const rowsFor=async()=>{const rows={},srcOf={};for(const id of CHAIN){const demo=Data.raw[id].kind==="demo";srcOf[id]=demo?"indicative":"recorded";rows[id]=demo&&!S.showInd?[]:await Data.repo(id).list().catch(()=>[])}return{rows,srcOf}};
+async function rebuildTrace(){const{rows,srcOf}=await rowsFor();buildTrace({farms,stations,rows,srcOf});dirty();resetSearch();resetForms();
+  if(farmsDone&&S.sel&&!valid(S.sel))S.sel=null;if(mapReady()){buildFarmLayer();buildStationLayer()}lastInd=S.showInd;render()}
 const valid=({type,id})=>!!({plot:T.farmById,farmer:T.plotsOf,station:T.stations,delivery:T.del,lot:T.lot,batch:T.bat,exporter:T.exp,importer:T.imp}[type]||{})[id];
 async function start(){
   $("#splash").hidden=true;$("#app").hidden=false;$("#rail").hidden=false;readHash();
@@ -76,7 +75,6 @@ $("#recbtn").onclick=e=>{e.stopPropagation();const m=newMenu(),el=$("#recmenu");
 document.addEventListener("click",e=>{const n=e.target.closest("[data-new]");if(n){$("#recmenu").hidden=true;n.dataset.new==="find_farmer"?openFarmerQuestionnaire():openForm(n.dataset.new)}else if(!e.target.closest(".menuwrap"))$("#recmenu").hidden=true;
   if(e.target.id==="radd"){const mid=REGMODEL(S.rtab);mid&&openForm(mid)}
   if(e.target.id==="dedit")startEdit(S.sel.type,S.sel.id);if(e.target.id==="ddel")removeRecord(S.sel.type,S.sel.id).then(()=>change({sel:null}))});
-document.addEventListener("click",async e=>{if(CFG.DEMO_CHAIN)return;if(e.target.id==="bnLive"){e.preventDefault();const{setBackend}=await import("./data/index.js");for(const id of["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"])await setBackend(id,"auto");toast("Back to live data");await ctx.reload()}});
 // Nothing fails silently: any unexpected error is shown, with detail you can send.
 const oops=m=>{console.error(m);toast("Something went wrong: "+String(m?.message||m).slice(0,140))};
 addEventListener("error",e=>oops(e.error||e.message));addEventListener("unhandledrejection",e=>oops(e.reason));

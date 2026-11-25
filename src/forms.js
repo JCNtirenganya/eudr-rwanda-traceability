@@ -1,23 +1,22 @@
 // Record forms, generated from the model definitions. One engine; delivery, lot and batch add the pieces they need.
 // A form never closes on an error and never loses what was typed.
-import {Data,DISABLED} from "./data/index.js";
+import {Data} from "./data/index.js";
 import {T,chain} from "./trace.js";
 import {validateRecord} from "./engine/schema.js";
-import {capturePoint} from "./gps.js";
 import {$,esc,N,combo,toast,pill,tag,worst,COL,LBL} from "./ui.js";
 export const hooks={refresh:async()=>{},center:()=>null};
 const today=()=>new Date().toISOString().slice(0,10),mask=n=>n?"•••• "+String(n).slice(-4):"";
 const me=()=>Data.me,mine=id=>me().isAdmin||me().stations.includes(id);
-const MODEL_OF={plot:"farm_recorded",delivery:"cherry_delivery",lot:"lot",batch:"export_batch",exporter:"exporter",importer:"importer"};
-const NEW=[["cherry_delivery","Record a cherry delivery"],["lot","New lot"],["export_batch","New export batch"],["exporter","New exporter"],["importer","New importer"],["user_assignment","Assign staff to a station"]];
-// Read-only Portal lookup; recorded farm/CWS forms are disabled.
+const MODEL_OF={delivery:"cherry_delivery",lot:"lot",batch:"export_batch",exporter:"exporter",importer:"importer"};
+const NEW=[["cherry_delivery","Record a cherry delivery"],["lot","New lot"],["export_batch","New export batch"],["exporter","New exporter"],["importer","New importer"]];
+// Read-only Portal lookup; farms, farmers and CWS are never recorded here.
 const QUEST=[["find_farmer","Find a farmer in Portal (read only)"]];
-export const canNew=id=>{const m=Data.models[id];return!!m&&!DISABLED.has(id)&&(me().isAdmin||(me().role==="editor"&&!m.adminOnly&&["cherry_delivery","lot"].includes(id)))};
+export const canNew=id=>!!Data.models[id]&&me().isAdmin;
 export const newMenu=()=>[...QUEST,...NEW].filter(([id])=>id==="find_farmer"||canNew(id)).map(([id,l])=>[id,l+(Data.raw[id]?.kind==="demo"?"  (demo — not saved)":"")]);
 // ---- who may change an existing record, and which model it belongs to
-export function editInfo(type,id){const mid=type==="station"?(Data.raw.station_recorded?"station_recorded":"cws_recorded"):MODEL_OF[type];if(!mid||!Data.raw[mid]||["demo","disabled"].includes(Data.raw[mid].kind))return null;
-  const rec=({plot:T.farmById,delivery:T.del,lot:T.lot,batch:T.bat,exporter:T.exp,importer:T.imp,station:T.stations}[type]||{})[id];if(!rec||rec.src==="live"||rec.src==="indicative")return null;
-  const m=Data.models[mid],full=rec;return Data.me.isAdmin||(me().role==="editor"&&["cherry_delivery","lot"].includes(mid)&&mine(rec.cws_id))?{mid,model:m,rec:full}:null}
+export function editInfo(type,id){const mid=MODEL_OF[type];if(!mid||Data.raw[mid]?.kind==="demo")return null;
+  const rec=({delivery:T.del,lot:T.lot,batch:T.bat,exporter:T.exp,importer:T.imp}[type]||{})[id];if(!rec||rec.src==="indicative")return null;
+  const m=Data.models[mid];return Data.me.isAdmin?{mid,model:m,rec}:null}
 // ---- option lists for link fields
 let fIdx=null;export const resetForms=()=>{fIdx=null};
 const farmerOpts=()=>fIdx??=Object.entries(T.plotsOf).map(([fm,a])=>({v:fm,t:`${a[0].nm||"Farmer"} · ${fm}`,sub:`${mask(a[0].nid)} · ${a[0].sec} · ${a.length} farm(s)`,x:a[0].nid}));
@@ -40,7 +39,6 @@ const FIELD=(f,v)=>f.type==="link"?`<div class="fld ${f.w?"w":""}" data-fk="${f.
 export function openForm(modelId,{rec=null,defaults={},after=()=>{},title}={}){
   const m=Data.models[modelId],repo=Data.repo(modelId),edit=!!rec,vals={...defaults,...(rec||{})},demo=Data.raw[modelId].kind==="demo",dlg=$("#modal");
   let fields=m.fields.filter(f=>f.type!=="file"&&!f.auto);
-  if(m.storage==="layer"&&m.geometry==="point")fields=[...fields,{k:"__lat",label:"Latitude",type:"decimal",req:true,min:-3,max:-1},{k:"__lng",label:"Longitude",type:"decimal",req:true,min:28.8,max:31}];
   if(modelId==="cherry_delivery"){fields=fields.map(f=>f.k==="plot_id"?{...f,req:true,help:"One delivery = one farm. If the farmer brought cherries from two farms, record two deliveries."}:f);if(!edit){vals.delivery_date??=today();const a=Data.me.stations;if(a.length===1)vals.cws_id??=a[0]}}
   if(!edit)for(const f of fields)if(f.default!=null&&vals[f.k]==null)vals[f.k]=f.default; // model-defined defaults (e.g. status "open")
   if(modelId==="lot"&&!edit)vals.lot_date??=today();if(modelId==="export_batch"&&!edit)vals.ship_date??="";
@@ -48,8 +46,7 @@ export function openForm(modelId,{rec=null,defaults={},after=()=>{},title}={}){
   dlg.innerHTML=`<form id="mf" novalidate><h3>${esc(title||(edit?"Edit ":"New ")+m.name.toLowerCase())}</h3>
    ${demo?'<p class="warnbox">This model is on <b>Demo</b>. What you enter is <b>not saved</b> and is labelled Indicative.</p>':""}
    ${modelId==="cherry_delivery"?'<div id="fcard" class="fcard"></div>':""}
-   <div class="grid2">${fields.map(f=>FIELD(f,f.k==="__lat"?rec?.geometry?.y:f.k==="__lng"?rec?.geometry?.x:vals[f.k])).join("")}</div>
-   ${m.storage==="layer"&&m.geometry==="point"?'<div class="gpsrow"><button type="button" id="useGps">Capture location with GPS</button><button type="button" class="ghost" id="useCtr">Use the current map centre</button><span id="gpsmsg" class="muted"></span></div>':""}
+   <div class="grid2">${fields.map(f=>FIELD(f,vals[f.k])).join("")}</div>
    ${pick?`<div class="pickbox"><b id="ptitle"></b><input id="pq" placeholder="Filter…"><div id="plist" class="chkl"></div><p id="psum" class="muted"></p></div>`:""}
    <p class="err" id="merr" role="alert"></p><div class="row"><button type="button" class="ghost" id="mcancel">Cancel</button>${modelId==="cherry_delivery"&&!edit?'<button type="button" class="ghost" id="msaveadd">Save &amp; add another</button>':""}<button id="msave">${edit?"Save changes":"Save"}</button></div></form>`;
   const link=k=>fields.find(f=>f.k===k);
@@ -59,9 +56,6 @@ export function openForm(modelId,{rec=null,defaults={},after=()=>{},title}={}){
   const combos={};dlg.querySelectorAll("[data-lk]").forEach(h=>{const f=link(h.dataset.lk),src=f.to;
     combos[f.k]=combo(h,{label:f.label+(f.req?" *":""),ph:src==="farmer"?"Type a name, farmer ID or National ID…":src==="plot"?"Choose the farmer first, then the farm…":"Choose…",get:()=>(OPT[src]||(()=>[]))(vals),value:vals[f.k]||"",onPick:v=>{vals[f.k]=v;if(f.k==="farmer_id"){const pl=T.plotsOf[v]||[];vals.plot_id=pl.length===1?pl[0].id:"";combos.plot_id?.set(vals.plot_id)}if(f.k==="farmer_id"||f.k==="plot_id")refreshCard();if(f.k==="cws_id")redrawPick()}})});
   refreshCard();$("#mcancel").onclick=()=>dlg.close();
-  $("#useGps")?.addEventListener("click",()=>{const msg=$("#gpsmsg");msg.textContent="Getting a fix…";capturePoint({onProgress:(k,n,acc,good)=>{msg.textContent=good?`Fix ${k}/${n} · ±${acc.toFixed(0)} m`:`Weak signal ±${acc.toFixed(0)} m — wait or move to open sky`},
-    onDone:p=>{dlg.querySelector('[data-k="__lat"]').value=p.lat.toFixed(6);dlg.querySelector('[data-k="__lng"]').value=p.lng.toFixed(6);vals.gps_accuracy_m=+p.acc.toFixed(1);vals.gps_method="gps_average";msg.textContent=`Location set · accuracy about ±${p.acc.toFixed(0)} m`},onError:e=>{msg.textContent=e}})});
-  $("#useCtr")?.addEventListener("click",()=>{const c=hooks.center();if(c){dlg.querySelector('[data-k="__lat"]').value=c.lat.toFixed(6);dlg.querySelector('[data-k="__lng"]').value=c.lng.toFixed(6)}});
   // pick lists: deliveries for a lot, lots for a batch
   const chosen=new Set();let pitems=[];
   function redrawPick(){if(!pick)return;const q=($("#pq").value||"").toLowerCase();
@@ -79,15 +73,14 @@ export function openForm(modelId,{rec=null,defaults={},after=()=>{},title}={}){
       const f=fields.find(x=>x.k===k);if(f?.type==="bool")v=v===""?null:v==="1";if(["int","decimal"].includes(f?.type)&&v!=="")v=+v;if(v==="")v=null;o[k]=v});return o};
   const showErr=(errs,msg)=>{dlg.querySelectorAll(".ferr").forEach(e=>e.textContent="");for(const[k,t]of Object.entries(errs||{})){const e=dlg.querySelector(`[data-fk="${k}"] .ferr`);if(e)e.textContent=t}$("#merr").textContent=msg||""};
   async function save(again){const b1=$("#msave"),b2=$("#msaveadd");b1.disabled=true;b2&&(b2.disabled=true);showErr({},"");
-    try{const o=read();if(m.storage==="layer"){o.geometry={x:+o.__lng,y:+o.__lat,spatialReference:{wkid:4326}}}if(modelId==="station_recorded"){o.name_of_cw=o.cws_name;o.x_coordina=+o.__lng;o.y_coordina=+o.__lat}delete o.__lat;delete o.__lng;
-      const v=validateRecord(m,o);const errs={...v.errors};
-      if(modelId==="cherry_delivery"){if(o.plot_id&&o.farmer_id&&T.farmById[o.plot_id]&&T.farmById[o.plot_id].fm!==o.farmer_id)errs.plot_id="This farm does not belong to the selected farmer.";if(!errs.farmer_id&&o.farmer_id&&!T.plotsOf[o.farmer_id]&&Data.raw.farmer_recorded.kind==="demo")errs.farmer_id="This farmer ID is not in the farms layer.";
+    try{const o=read();const v=validateRecord(m,o);const errs={...v.errors};
+      if(modelId==="cherry_delivery"){if(o.plot_id&&o.farmer_id&&T.farmById[o.plot_id]&&T.farmById[o.plot_id].fm!==o.farmer_id)errs.plot_id="This farm does not belong to the selected farmer.";if(!errs.farmer_id&&o.farmer_id&&!T.plotsOf[o.farmer_id])errs.farmer_id="This farmer ID is not in the Portal farms layer.";
         if(v.warnings.price_per_kg&&!o.notes)errs.notes="Add a note explaining why the price is below the NAEB minimum.";
         if(o.receipt_no&&Object.values(T.del).some(d=>d.cws_id===o.cws_id&&d.receipt_no===o.receipt_no&&d.delivery_id!==rec?.delivery_id))errs.receipt_no="This receipt number is already used at this station."}
       if(Object.keys(errs).length||(pick&&!chosen.size)){showErr(errs,Object.keys(errs).length?"Please fix the highlighted fields.":modelId==="lot"?"Choose at least one delivery for this lot.":"Choose at least one lot for this batch.");throw 0}
       if(v.warnings.parchment_kg_out)toast("⚠ "+v.warnings.parchment_kg_out);
       let out;
-      if(edit){const patch={};for(const f of fields){if(f.k.startsWith("__"))continue;if(JSON.stringify(o[f.k]??null)!==JSON.stringify(rec[f.k]??null))patch[f.k]=o[f.k]}if(o.geometry)patch.geometry=o.geometry;out=await repo.update(rec[m.key],patch)}
+      if(edit){const patch={};for(const f of fields)if(JSON.stringify(o[f.k]??null)!==JSON.stringify(rec[f.k]??null))patch[f.k]=o[f.k];out=await repo.update(rec[m.key],patch)}
       else{out=await repo.create(o);
         if(pick&&chosen.size){const lr=Data.repo(modelId==="lot"?"lot_delivery":"batch_lot"),made=[];
           try{for(const id of chosen)made.push(await lr.create(modelId==="lot"?{lot_id:out.lot_id,delivery_id:id,kg_allocated:T.del[id].weight_kg}:{batch_id:out.batch_id,lot_id:id,kg:T.lot[id].parchment_kg_out||0}))}
@@ -98,11 +91,10 @@ export function openForm(modelId,{rec=null,defaults={},after=()=>{},title}={}){
   $("#mf").onsubmit=e=>{e.preventDefault();save(false)};$("#msaveadd")?.addEventListener("click",()=>save(true));dlg.showModal();
   (dlg.querySelector("[data-lk] input")||dlg.querySelector("[data-k]"))?.focus()}
 export async function startEdit(type,id){const info=editInfo(type,id);if(!info)return;try{const rec=await Data.repo(info.mid).get(id);if(!rec)return toast("This record no longer exists.");openForm(info.mid,{rec})}catch(e){toast(e.message)}}
-export const addFor=type=>{const mid=type==="station"?(Data.raw.station_recorded?"station_recorded":null):type==="plot"?null:MODEL_OF[type];return mid&&canNew(mid)?mid:null};
+export const addFor=type=>{const mid=MODEL_OF[type];return mid&&canNew(mid)?mid:null};
 export async function removeRecord(type,id){const info=editInfo(type,id);if(!info)return;const{mid,model}=info;
   if(type==="delivery"&&(T.ldByDel[id]||[]).length)return toast("This delivery is in a lot. Remove the lot first.");
   if(type==="lot"&&(T.blByLot[id]||[]).length)return toast("This lot is in a batch. Remove the batch first.");
-  if(type==="station"&&(T.delByStation[id]||[]).length)return toast("This station has deliveries and cannot be deleted.");
   if(!confirm(`Delete ${model.name.toLowerCase()} ${id}? It is hidden, not erased, and the deletion is logged.`))return;
   try{if(type==="lot")for(const d of T.ldByLot[id]||[]){const l=(await Data.repo("lot_delivery").list()).find(x=>x.lot_id===id&&x.delivery_id===d);l&&await Data.repo("lot_delivery").softDelete(l.link_id)}
     if(type==="batch")for(const l of T.blByBatch[id]||[]){const r=(await Data.repo("batch_lot").list()).find(x=>x.batch_id===id&&x.lot_id===l);r&&await Data.repo("batch_lot").softDelete(r.link_id)}

@@ -30,13 +30,10 @@ export async function loadCWS(){
     ownership:a.type_of_ownership||a.type_of_ow,province:PROV[a.province]||a.province,district:a.district,sector:a.sector,cell:a.cell,village:a.village,capacity_mt:a.processing_capacity,year:a.year_of_establishment>1900?a.year_of_establishment:null,
     phone:"",email:"",src:"live",lat:a.y_coordinate??g?.y,lng:a.x_coordinate??g?.x})).filter(s=>s.lat&&s.lng)}
 
-async function farmsUrl(){
-  if(CFG.FARMS_URL)return CFG.FARMS_URL;
-  const it=await req(`${CFG.PORTAL}/sharing/rest/content/items/${CFG.FARMS_ITEM_ID}`);
-  return/\/\d+$/.test(it.url)?it.url:`${it.url}/${CFG.FARMS_LAYER}`}
+const farmsUrl=()=>CFG.FARMS_URL;
 // Identity fields stay in ArcGIS. The questionnaire uses this with the Portal token the user already has.
 export async function findFarmerByNationalId(nid){
-  const url=await farmsUrl(),q=String(nid).trim().replace(/'/g,"''");
+  const url=farmsUrl(),q=String(nid).trim().replace(/'/g,"''");
   if(!nidField){const m=await req(url),fields=(m.fields||[]).map(f=>f.name);nidField=NID_KEYS.find(k=>fields.includes(k))||fields.find(n=>/national.?id/i.test(n))||NID_KEYS[0]}
   const d=await req(url+"/query",{where:`${nidField}='${q}'`,outFields:"*",returnGeometry:false,resultRecordCount:2});
   const a=d.features?.[0]?.attributes;if(!a)return null;
@@ -68,7 +65,7 @@ function toFarm({attributes:a,geometry:g},cf,id){
     c:ring&&[ring.reduce((s,p)=>s+p[0],0)/ring.length,ring.reduce((s,p)=>s+p[1],0)/ring.length]}}
 
 export async function loadFarms(onProgress=()=>{}){
-  const{features:rows,fields:names}=await layerFeatures(await farmsUrl());
+  const{features:rows,fields:names}=await layerFeatures(farmsUrl());
   if(!rows.length)throw new Error("Portal farms layer returned no rows — check EUDR_Data/0 access");
   cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=farmInfo.fields;
   const seen=new Map();
@@ -86,10 +83,3 @@ function cf(s,rows,names){
   farmInfo.convField=(s.convField||detected||"");
   farmInfo.unknownUse={};farmInfo.values={}}
 
-// Farms entered in this system become ordinary farm objects, screened by the same rules, tagged "recorded".
-export function recordedFarm(r){const ring=r.geometry?.rings?.[0]?.map(p=>[p[1],p[0]]);if(!ring||ring.length<3)return null;
-  const[eudr,why]=screen({prior_land_use:r.prior_land_use,first_planting_year:r.first_planting_year,overlaps_other_plot:r.overlaps_other_plot},null),t=toMs(r.survey_date)||toMs(r.created_date)||0,n=ring.length>1&&ring[0][0]===ring.at(-1)[0]?ring.slice(0,-1):ring;
-  return{type:"plot",src:"recorded",id:String(r.plot_id),fm:String(r.farmer_id),nm:String(r.farmer_id||""),nid:"",phone:"",prov:r.province,coop:r.cooperative_name||"",stn:r.station_id||"",district:r.district,sec:r.sector,cell:r.cell,village:r.village,
-    ha:r.area_ha||0,trees:r.trees_total,kg:r.farmer_prod_kg_2025,prior:r.prior_land_use,first:r.first_planting_year,conv:null,sp:r.coffee_species,reg:r.land_registered,ch:r.sale_channel,eudr,why,ring:n,t,day:t?new Date(t).toISOString().slice(0,10):"",
-    c:[n.reduce((a,p)=>a+p[0],0)/n.length,n.reduce((a,p)=>a+p[1],0)/n.length]}}
-export async function layerMetas(){const[f,st]=await Promise.all([req(await farmsUrl()),req(CFG.CWS_URL)]);return{farms:f,stations:st}}

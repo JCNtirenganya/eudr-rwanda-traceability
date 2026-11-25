@@ -5,46 +5,7 @@ const day=(d0,n)=>new Date(Date.UTC(2026,5,1)+(d0+n)*864e5).toISOString().slice(
 const ind=r=>({...r,data_source:"indicative",is_deleted:0});
 const pad=(n,w)=>String(n).padStart(w,"0");
 
-// Local, cached fallback rows used by the unit test only. The app never uses these for farms or CWS:
-// it reads the real Portal layers with the signed-in user's token. No personal identity is invented.
-const SITES=[
-  ["Northern","Musanze","Musanze","Kivumu","-1.5050","29.6350"],
-  ["Northern","Burera","Rugarama","Rugarama","-1.4660","29.7040"],
-  ["Western","Rusizi","Kamembwe","Kamembwe","-2.4850","28.9150"],
-  ["Western","Karongi","Rubavu","Rubavu","-2.0600","29.3600"],
-  ["Southern","Huye","Tumba","Tumba","-2.5950","29.7400"],
-  ["Southern","Nyaruguru","Kivu","Kivu","-2.7400","29.5900"],
-  ["Eastern","Gatsibo","Kiziguro","Kiziguro","-1.7300","30.3900"],
-  ["Eastern","Kayonza","Kabarore","Kabarore","-1.8900","30.5600"],
-  ["Kigali","Gasabo","Kimironko","Kimironko","-1.9300","30.0900"],
-];
-let base=null;
-export async function demoBase(){
-  if(base)return base;
-  const stations=[],farms=[];
-  SITES.forEach(([province,district,sector,cell,lat,lng],si)=>{
-    for(let k=0;k<3;k++){
-      const n=si*3+k+1,id="CWS-"+pad(n,3),ly=+lat+(k-1)*0.012,lx=+lng+((si+k)%3-1)*0.014;
-      stations.push({type:"station",id,name:`Indicative CWS ${pad(n,3)}`,owner:"",ownership:"Cooperative",province,district,
-        sector,cell,village:cell,capacity_mt:120+hash(id)%380,year:2004+hash(id+"year")%18,
-        phone:"",email:"",src:"indicative",lat:ly,lng:lx});
-      for(let j=0;j<12;j++){
-        const q=n*100+j+1,pid="PL-"+pad(q,5),fm="FRM-"+pad(Math.ceil(q/2),5),x=lx+((j%4)-1.5)*0.009,y=ly+(Math.floor(j/4)-1)*0.009;
-        const ring=[[x-0.003,y-0.002],[x+0.003,y-0.002],[x+0.003,y+0.002],[x-0.003,y+0.002],[x-0.003,y-0.002]];
-        const forest=q%5===0||q%5===4,late=forest&&q%3===0,geometryIssue=q%17===0;
-        const prior=forest?"Forest/Wooded land":q%5===1?"Cropland":q%5===2?"Grassland/Pasture":q%5===3?"Other: Ntacyo":"Cropland";
-        const first=forest?(late?2022:2015):2010+q%12,eudr=geometryIssue?"blocked":late?"blocked":forest?"review":"low";
-        const why=geometryIssue?"Indicative plot overlaps another plot.":late?"Indicative forest converted after 31 Dec 2020.":forest?"Indicative forest needs a conversion date.":"Indicative pre-2020 farmland; satellite check pending.";
-        farms.push({type:"plot",src:"indicative",id:pid,fm,nm:fm,nid:"",phone:"",prov:province,coop:"Indicative cooperative",
-          stn:id,district,sec:sector,cell,village:cell,ha:Math.round((0.4+hash(pid)%120)/10)/10,trees:180+hash(pid+"t")%600,
-          kg:350+hash(pid+"kg")%900,prior,first,conv:late?Date.UTC(2022,0,15):null,sp:"Arabica",reg:q%2?"Yes":"No",
-          ch:"Cooperative",eudr,why,ring,t:Date.UTC(2026,5,1+q%25),day:day(q%25,0),c:[x,y]});
-      }
-    }
-  });
-  return base={farms,stations};
-}
-// The generators read their parents through ctx.rows(modelId), so they work whether a parent is live or demo.
+// The generators read their parents through ctx.rows(modelId), so they work with live Portal farms/stations.
 export const GEN={
   async cherry_delivery({farms,stations}){const r=rng(11),pool={};stations.forEach(s=>{(pool[s.district+"|"+s.sector]??=[]).push(s.id);(pool[s.district]??=[]).push(s.id)});
     const by={};farms.forEach(f=>(by[f.fm]??=[]).push(f));const out=[];let i=0;
@@ -66,7 +27,7 @@ export const GEN={
     return out},
   async batch_lot({rows}){const out=[];let i=0;for(const b of await rows("export_batch"))for(const l of b._lots||[])out.push(ind({link_id:"BL-"+String(++i).padStart(6,"0"),batch_id:b.batch_id,lot_id:l.lot_id,kg:l.parchment_kg_out}));return out}};
 const strip=r=>{const{_dels,_lots,...x}=r;return x};
-// In-memory repo with the same interface as ArcGISRepo. Writes last for this session only and are labelled indicative.
+// In-memory repo with the same interface as SupabaseRepo. Writes last for this session only and are labelled indicative.
 export class DemoRepo{
   constructor(model,load){this.m=model;this.load=load;this.kind="demo"}
   async raw(){return this._raw??=await this.load()}            // un-stripped rows: link generators need the hidden _dels/_lots
