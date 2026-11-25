@@ -5,7 +5,7 @@ export const CFG = {
   PORTAL: "https://gis.naeb.gov.rw/portal",
   CWS_URL: "https://gis.naeb.gov.rw/server/rest/services/Hosted/Coffee_Washing_Station/FeatureServer/0",
   FARMS_ITEM_ID: "63a787f80563400fa9e46af7f006d714", FARMS_LAYER: 0,
-  FARMS_URL: "",                 // optional full .../FeatureServer/0 URL (otherwise resolved from the portal item)
+  FARMS_URL: "https://gis.naeb.gov.rw/portal/sharing/servers/63a787f80563400fa9e46af7f006d714/rest/services/EUDR_Data/FeatureServer/0", // the Portal item's farms sublayer, read directly with the signed-in token
   CONVERSION_FIELD: "",          // exact "forest converted to farmland" field; empty = detect "conver"
   OWNER: "Coffee_Trace",
   FOLDER: "Trace", TAG: "eudr-trace",  // only used by the retired portal publisher

@@ -21,7 +21,7 @@ await p.route("**/*",async r=>{const u=r.request().url(),m=r.request().method();
    if(u.includes("/query"))return r.fulfill({json:doQuery(tb,q)});return r.fulfill({json:{maxRecordCount:1000,objectIdField:"objectid",fields:[]}})}
  if(u.includes("Coffee_Washing_Station"))return r.fulfill({json:{features:FAKE_STATIONS()}});
  if(u.includes("content/items/63a7"))return r.fulfill({json:{url:"https://gis.naeb.gov.rw/server/rest/services/Farms/FeatureServer"}});
- if(u.includes("Farms/FeatureServer")){if(!u.includes("/query"))return r.fulfill({json:{maxRecordCount:1000,objectIdField:"objectid",fields:farmMeta.fields}});
+ if(u.includes("EUDR_Data/FeatureServer")||u.includes("Farms/FeatureServer")){if(!u.includes("/query"))return r.fulfill({json:{maxRecordCount:1000,objectIdField:"objectid",fields:farmMeta.fields}});
   const q=new URLSearchParams(m==="POST"?(r.request().postData()||""):new URL(u).search),nid=(q.get("where")||"").match(/national_id='([^']*)'/)?.[1],f=FAKE_FARMS().filter(x=>!nid||String(x.attributes.national_id)===nid);if(q.get("returnIdsOnly")==="true")return r.fulfill({json:{objectIds:f.map((_,i)=>i+1)}});return r.fulfill({json:{features:f}})}
  return r.abort()});
 const FT=(n,type="esriFieldTypeString",x={})=>({name:n,type,alias:n.replace(/_/g," "),length:100,...x}),YN={type:"codedValue",codedValues:[{code:"Yes",name:"Yes"},{code:"No",name:"No"}]};

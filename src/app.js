@@ -16,7 +16,7 @@ import {renderAdmin,ctx} from "./admin.js";
 import {hooks,newMenu,openForm,removeRecord,startEdit,resetForms,addFor} from "./forms.js";
 import {mapCenter} from "./map.js";
 import {openFarmerQuestionnaire} from "./quest.js";
-let stations=[],farms=[],farmsDone=false,lastInd=true,builtFarms=null;
+let stations=[],farms=[],farmsDone=false,lastInd=true,builtFarms=null,farmError="";
 const NAV=[["overview","Overview","db"],["map","Map","map"],["graph","Network","graph"],["registry","Registry","list"],["report","Reports","file"],["admin","Admin","db"]];
 
 // ---- sign-in gate ----
@@ -39,13 +39,14 @@ async function start(){
   $("#whoami").textContent=`${Data.me.fullName} · ${Data.me.role}`;$("#browse").open=localStorage.getItem("eudr.browse")==="1";initMap();await rebuildTrace();setView(S.view,true);
   loadFarmsInBackground()}
 async function loadFarmsInBackground(){
-  try{farms=await loadFarms((d,n)=>{$("#src").textContent=`Loading farm polygons ${N(d)} / ${N(n)}…`});setFarms(farms);farmsDone=true;await rebuildTrace();fitScope();banner()}
-  catch(e){$("#src").innerHTML=`⚠ Farm polygons did not load: ${esc(e.message)} <button class="ghost" id="retryFarms">Retry</button>`;$("#retryFarms").onclick=loadFarmsInBackground}}
+  try{farms=await loadFarms((d,n)=>{$("#src").textContent=`Loading farm polygons ${N(d)} / ${N(n)}…`});setFarms(farms);farmsDone=true;farmError="";await rebuildTrace();fitScope();banner()}
+  catch(e){farmError=e.message;$("#src").innerHTML=`⚠ Farm polygons did not load: ${esc(farmError)} <button class="ghost" id="retryFarms">Retry</button>`;$("#retryFarms").onclick=loadFarmsInBackground}}
 ctx.reload=async()=>{await init({farms,stations});await rebuildTrace()};
 const banner=()=>{const dm=status().filter(x=>x.mode==="demo"&&["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","exporter","importer"].includes(x.id)),bn=$("#banner");
   if(CFG.DEMO_CHAIN){bn.hidden=false;bn.innerHTML="<b>Demo chain records</b> Farms, farmers and CWS are read live from Portal. Supabase is not connected yet, so chain records are indicative and anything you record here is <b>not saved</b>."}
   else{bn.hidden=!dm.length;bn.innerHTML=dm.length?`<b>Demo data is switched on in this browser</b> for ${dm.length} model(s). Anything you record on them is <b>not saved</b> and is labelled Indicative. <a href="#" id="bnLive">Switch to live data</a>`:""}
-  const st=status(),demo=st.filter(s=>s.mode==="demo").length;$("#src").innerHTML=`<span class="dotlive"></span> ${N(farms.length)} farm polygons · ${stations.length} stations`;
+  const st=status(),demo=st.filter(s=>s.mode==="demo").length;$("#src").innerHTML=`<span class="dotlive"></span> ${N(farms.length)} farm polygons · ${stations.length} stations`+(farmError?` <span class="tag indicative">⚠ ${esc(farmError)} <button class="ghost" id="retryFarms">Retry</button></span>`:"");
+  if(farmError)$("#retryFarms").onclick=loadFarmsInBackground;
   $("#dpill").innerHTML=CFG.DEMO_CHAIN?`<span class="tag indicative">demo chain</span>`:demo?`<span class="tag indicative">${demo} of ${st.length} models on demo</span>`:`<span class="tag real">all models live</span>`;$("#dpill").title="Data status — open Admin for details"};
 
 // ---- views ----
