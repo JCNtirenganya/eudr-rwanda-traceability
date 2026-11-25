@@ -4,6 +4,17 @@ import {CFG} from "../config.js";
 import {req} from "./http.js";
 import {classify} from "../landuse.js";
 const PROV={South:"Southern",West:"Western",East:"Eastern",North:"Northern"};
+const pick=(a,names)=>{for(const n of names)if(a[n]!=null&&a[n]!=="")return a[n];return null};
+const PLOT_KEYS=["plot_id","Plot_ID","plotid","PlotID","PlotId","plot_no","Plot_No","parcel_id","Parcel_ID","farm_plot_id","FarmPlotID"];
+const FARMER_KEYS=["farmer_id","Farmer_ID","farmerid","FarmerID","FarmerId","farmer_uid","farmer_code"];
+const NID_KEYS=["national_id","National_ID","nationalid","NationalID","nid","NID","id_number","ID_Number"];
+let nidField="";
+function plotKey(a,fields){
+  const v=pick(a,PLOT_KEYS);if(v!=null)return String(v);
+  const f=(fields||[]).find(n=>/^(plot|parcel)/i.test(n)&&!/farmer/i.test(n));
+  if(f&&a[f]!=null&&a[f]!=="")return String(a[f]);
+  const oid=pick(a,["OBJECTID","objectid","ObjectId","FID","fid"]);
+  return oid!=null?String(oid):null}
 
 async function layerFeatures(url){
   const meta=await req(url),page=Math.min(meta.maxRecordCount||1000,1000),features=[];
@@ -25,9 +36,11 @@ async function farmsUrl(){
   return/\/\d+$/.test(it.url)?it.url:`${it.url}/${CFG.FARMS_LAYER}`}
 // Identity fields stay in ArcGIS. The questionnaire uses this with the Portal token the user already has.
 export async function findFarmerByNationalId(nid){
-  const url=await farmsUrl(),q=String(nid).trim().replace(/'/g,"''"),d=await req(url+"/query",{where:`national_id='${q}'`,outFields:"*",returnGeometry:false,resultRecordCount:2});
+  const url=await farmsUrl(),q=String(nid).trim().replace(/'/g,"''");
+  if(!nidField){const m=await req(url),fields=(m.fields||[]).map(f=>f.name);nidField=NID_KEYS.find(k=>fields.includes(k))||fields.find(n=>/national.?id/i.test(n))||NID_KEYS[0]}
+  const d=await req(url+"/query",{where:`${nidField}='${q}'`,outFields:"*",returnGeometry:false,resultRecordCount:2});
   const a=d.features?.[0]?.attributes;if(!a)return null;
-  return{farmer_id:String(a.farmer_id||""),farmer_name:a.farmer_name||"",national_id:String(a.national_id||nid),phone:String(a.phone||""),province:a.province,district:a.district,
+  return{farmer_id:String(pick(a,FARMER_KEYS)||""),farmer_name:a.farmer_name||"",national_id:String(pick(a,NID_KEYS)||nid),phone:String(a.phone||""),province:a.province,district:a.district,
     sector:a.sector,cell:a.cell,village:a.village,cooperative_name:a.cooperative_name||null,station_id:a.station_id||"",station_name:a.station_name||""}}
 
 // EUDR deforestation pre-screen. The test is the land's condition on the cut-off date.
@@ -48,20 +61,22 @@ export function screen(a,conv){
   if(y!=null&&y<=2020)return["low",`Forest${via}; coffee first planted in ${y}, so it was converted no later than that — before 31 Dec 2020 (declared, from first planting year). Satellite check pending.`];
   if(y!=null)return["review",`Forest${via}; coffee first planted in ${y}. Confirm the forest was converted to farmland before 31 Dec 2020 (planting after 2020 does not by itself mean conversion after 2020).`];
   return["review","Forest and no conversion date or valid first planting year recorded."]}
-function toFarm({attributes:a,geometry:g},cf){
-  const ring=g?.rings?.[0]?.map(p=>[p[1],p[0]]),conv=cf?toMs(a[cf]):null,[eudr,why]=screen(a,conv),t=+a.survey_date||0;
-  return{type:"plot",src:"live",id:String(a.plot_id),fm:String(a.farmer_id),nm:String(a.farmer_id||""),nid:"",phone:"",prov:a.province,coop:a.cooperative_name||"",stn:a.station_id||"",district:a.district,sec:a.sector,cell:a.cell,village:a.village,ha:a.area_ha||0,trees:a.trees_total,kg:a.farmer_prod_kg_2025>100000?null:a.farmer_prod_kg_2025,
+function toFarm({attributes:a,geometry:g},cf,id){
+  const ring=g?.rings?.[0]?.map(p=>[p[1],p[0]]),conv=cf?toMs(a[cf]):null,[eudr,why]=screen(a,conv),t=+a.survey_date||0,farmer=pick(a,FARMER_KEYS)||"";
+  return{type:"plot",src:"live",id:String(id),fm:String(farmer),nm:String(farmer),nid:"",phone:"",prov:a.province,coop:a.cooperative_name||"",stn:a.station_id||"",district:a.district,sec:a.sector,cell:a.cell,village:a.village,ha:a.area_ha||0,trees:a.trees_total,kg:a.farmer_prod_kg_2025>100000?null:a.farmer_prod_kg_2025,
     prior:a.prior_land_use,first:a.first_planting_year,conv,sp:a.coffee_species,reg:a.land_registered,ch:a.sale_channel,eudr,why,ring,t,day:t?new Date(t).toISOString().slice(0,10):"",
     c:ring&&[ring.reduce((s,p)=>s+p[0],0)/ring.length,ring.reduce((s,p)=>s+p[1],0)/ring.length]}}
 
 export async function loadFarms(onProgress=()=>{}){
   const{features:rows,fields:names}=await layerFeatures(await farmsUrl());
-  cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=(names.length?names:Object.keys(rows[0]?.attributes||{}));
+  if(!rows.length)throw new Error("Portal farms layer returned no rows — check EUDR_Data/0 access");
+  cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=farmInfo.fields;
   const seen=new Map();
-  for(const f of rows){const a=f.attributes;if(a.plot_id==null)continue;
+  for(const f of rows){const a=f.attributes,id=plotKey(a,fields);if(id==null)continue;
     const lu=classify(a.prior_land_use);if(lu.cls==="unknown"&&lu.text)farmInfo.unknownUse[lu.text.toLowerCase()]=(farmInfo.unknownUse[lu.text.toLowerCase()]||0)+1;
     for(const k of SUGGEST){const v=a[k];if(v!=null&&v!=="")(farmInfo.values[k]??={})[v]=(farmInfo.values[k][v]||0)+1}
-    seen.set(a.plot_id,toFarm(f,farmInfo.convField))}
+    seen.set(id,toFarm(f,farmInfo.convField,id))}
+  if(!seen.size)throw new Error(`No farm plot field found in Portal layer (fields: ${fields.slice(0,30).join(", ")})`);
   onProgress(rows.length,rows.length);
   return[...seen.values()]}
 
