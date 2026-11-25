@@ -1,10 +1,12 @@
 // Run: node tests/smoke.mjs  (optional; needs playwright. Skips cleanly when it is not installed.)
+// The app ships with DEMO_CHAIN=true; this test serves config with it false to exercise saved chain records.
 import {spawn} from "node:child_process";import fs from "node:fs";import {modelFromLayer,FARM,STATION} from "../src/layermodel.js";
 let chromium;try{({chromium}=await import("playwright"))}catch{console.log("SKIP tests/smoke.mjs — playwright is not installed.");process.exit(0)}
 const srv=spawn("python3",["-m","http.server","8767"],{stdio:"ignore"});await new Promise(r=>setTimeout(r,1200));
 const b=await chromium.launch(),ctx=await b.newContext({acceptDownloads:true,permissions:["geolocation"],geolocation:{latitude:-1.7,longitude:30.3,accuracy:6}}),p=await ctx.newPage(),errs=[];p.on("pageerror",e=>errs.push(e.message));
 const fakeL=`const c=()=>new Proxy(function(){},{get:(t,k)=>k==="then"?undefined:(k in t?t[k]:c()),apply:()=>c()});window.L=c();window.__poly=0;L.polygon=()=>{window.__poly++;return c()};L.circleMarker=()=>{window.__mk=(window.__mk||0)+1;return c()};L.map=()=>{const m=c();m.setView=()=>m;m.on=()=>m;m.invalidateSize=()=>m;m.removeLayer=()=>m;m.fitBounds=()=>{window.__fit=(window.__fit||0)+1;return m};return m};`;
-await p.route("**/*",r=>{const u=r.request().url(),m=r.request().method();
+await p.route("**/*",async r=>{const u=r.request().url(),m=r.request().method();
+ if(u.includes("/src/config.js")){const res=await r.fetch();const body=(await res.text()).replace("DEMO_CHAIN: true","DEMO_CHAIN: false");return r.fulfill({body,contentType:"text/javascript"})}
  if(u.startsWith("http://localhost"))return r.continue();
  if(u.includes("leaflet.min.js"))return r.fulfill({body:fakeL,contentType:"text/javascript"});
  if(u.includes("leaflet.min.css")||u.includes("fonts.g"))return r.fulfill({body:"",contentType:"text/css"});
@@ -19,8 +21,8 @@ await p.route("**/*",r=>{const u=r.request().url(),m=r.request().method();
    if(u.includes("/query"))return r.fulfill({json:doQuery(tb,q)});return r.fulfill({json:{maxRecordCount:1000,objectIdField:"objectid",fields:[]}})}
  if(u.includes("Coffee_Washing_Station"))return r.fulfill({json:{features:FAKE_STATIONS()}});
  if(u.includes("content/items/63a7"))return r.fulfill({json:{url:"https://gis.naeb.gov.rw/server/rest/services/Farms/FeatureServer"}});
- if(u.includes("Farms/FeatureServer")){if(m==="GET"&&!u.includes("returnIdsOnly"))return r.fulfill({json:{objectIdField:"objectid"}});if(m==="GET")return r.fulfill({json:{objectIds:Array.from({length:60},(_,i)=>i+1)}});
-  const q=new URLSearchParams(m==="POST"?(r.request().postData()||""):new URL(u).search),nid=(q.get("where")||"").match(/national_id='([^']*)'/)?.[1],f=FAKE_FARMS().filter(x=>!nid||String(x.attributes.national_id)===nid);return r.fulfill({json:{features:f}})}
+ if(u.includes("Farms/FeatureServer")){if(!u.includes("/query"))return r.fulfill({json:{maxRecordCount:1000,objectIdField:"objectid",fields:farmMeta.fields}});
+  const q=new URLSearchParams(m==="POST"?(r.request().postData()||""):new URL(u).search),nid=(q.get("where")||"").match(/national_id='([^']*)'/)?.[1],f=FAKE_FARMS().filter(x=>!nid||String(x.attributes.national_id)===nid);if(q.get("returnIdsOnly")==="true")return r.fulfill({json:{objectIds:f.map((_,i)=>i+1)}});return r.fulfill({json:{features:f}})}
  return r.abort()});
 const FT=(n,type="esriFieldTypeString",x={})=>({name:n,type,alias:n.replace(/_/g," "),length:100,...x}),YN={type:"codedValue",codedValues:[{code:"Yes",name:"Yes"},{code:"No",name:"No"}]};
 const farmMeta={fields:[FT("OBJECTID","esriFieldTypeOID"),FT("plot_id"),FT("farmer_id"),FT("station_id"),FT("station_name"),FT("farmer_name"),FT("national_id"),FT("phone"),FT("province"),FT("district"),FT("sector"),FT("cell"),FT("village"),FT("cooperative_name"),FT("sale_channel"),

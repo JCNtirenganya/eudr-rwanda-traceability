@@ -2,7 +2,6 @@
 // the signed-in Portal token; Supabase holds only chain records.
 import {CFG} from "../config.js";
 import {req} from "./http.js";
-import {demoBase} from "./demo.js";
 import {classify} from "../landuse.js";
 const PROV={South:"Southern",West:"Western",East:"Eastern",North:"Northern"};
 
@@ -15,7 +14,6 @@ async function layerFeatures(url){
   return{features,fields:(meta.fields||[]).map(f=>f.name)}}
 
 export async function loadCWS(){
-  if(CFG.OFFLINE_DEMO)return(await demoBase()).stations.map(s=>({...s}));
   const{features}=await layerFeatures(CFG.CWS_URL);
   return features.map(({attributes:a,geometry:g})=>({type:"station",id:String(a.cws_uid||a.globalid||"").replace(/[{}]/g,"").toLowerCase(),name:(a.cws_name||a.name_of_cw||"").trim(),owner:"",
     ownership:a.type_of_ownership||a.type_of_ow,province:PROV[a.province]||a.province,district:a.district,sector:a.sector,cell:a.cell,village:a.village,capacity_mt:a.processing_capacity,year:a.year_of_establishment>1900?a.year_of_establishment:null,
@@ -57,12 +55,6 @@ function toFarm({attributes:a,geometry:g},cf){
     c:ring&&[ring.reduce((s,p)=>s+p[0],0)/ring.length,ring.reduce((s,p)=>s+p[1],0)/ring.length]}}
 
 export async function loadFarms(onProgress=()=>{}){
-  if(CFG.OFFLINE_DEMO){
-    const rows=(await demoBase()).farms;
-    farmInfo.convField="";farmInfo.fields=Object.keys(rows[0]||{});farmInfo.unknownUse={};farmInfo.values={};
-    for(const f of rows){const lu=classify(f.prior);if(lu.cls==="unknown"&&lu.text){const k=lu.text.toLowerCase();farmInfo.unknownUse[k]=(farmInfo.unknownUse[k]||0)+1}}
-    onProgress(rows.length,rows.length);
-    return rows.map(f=>({...f}))}
   const{features:rows,fields:names}=await layerFeatures(await farmsUrl());
   cf({convField:CFG.CONVERSION_FIELD},rows,names);const fields=(names.length?names:Object.keys(rows[0]?.attributes||{}));
   const seen=new Map();
@@ -85,4 +77,4 @@ export function recordedFarm(r){const ring=r.geometry?.rings?.[0]?.map(p=>[p[1],
   return{type:"plot",src:"recorded",id:String(r.plot_id),fm:String(r.farmer_id),nm:String(r.farmer_id||""),nid:"",phone:"",prov:r.province,coop:r.cooperative_name||"",stn:r.station_id||"",district:r.district,sec:r.sector,cell:r.cell,village:r.village,
     ha:r.area_ha||0,trees:r.trees_total,kg:r.farmer_prod_kg_2025,prior:r.prior_land_use,first:r.first_planting_year,conv:null,sp:r.coffee_species,reg:r.land_registered,ch:r.sale_channel,eudr,why,ring:n,t,day:t?new Date(t).toISOString().slice(0,10):"",
     c:[n.reduce((a,p)=>a+p[0],0)/n.length,n.reduce((a,p)=>a+p[1],0)/n.length]}}
-export async function layerMetas(){if(CFG.OFFLINE_DEMO)return{farms:{fields:[]},stations:{fields:[]}};const[f,st]=await Promise.all([req(await farmsUrl()),req(CFG.CWS_URL)]);return{farms:f,stations:st}}
+export async function layerMetas(){const[f,st]=await Promise.all([req(await farmsUrl()),req(CFG.CWS_URL)]);return{farms:f,stations:st}}

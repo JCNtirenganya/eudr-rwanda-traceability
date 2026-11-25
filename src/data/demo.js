@@ -5,8 +5,8 @@ const day=(d0,n)=>new Date(Date.UTC(2026,5,1)+(d0+n)*864e5).toISOString().slice(
 const ind=r=>({...r,data_source:"indicative",is_deleted:0});
 const pad=(n,w)=>String(n).padStart(w,"0");
 
-// Indicative farms and CWS used while Supabase is not connected. Deterministic, local and cached,
-// so the map opens immediately after Portal sign-in. No personal identity is invented or stored.
+// Local, cached fallback rows used by the unit test only. The app never uses these for farms or CWS:
+// it reads the real Portal layers with the signed-in user's token. No personal identity is invented.
 const SITES=[
   ["Northern","Musanze","Musanze","Kivumu","-1.5050","29.6350"],
   ["Northern","Burera","Rugarama","Rugarama","-1.4660","29.7040"],

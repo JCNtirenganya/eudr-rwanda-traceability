@@ -47,12 +47,12 @@ const user=()=>Data.me?.username||"unknown";
 function build(id){
   const m=Data.all[id];let r;
   if(DISABLED.has(id))r=new DisabledRepo(m);
-  else if(CFG.OFFLINE_DEMO||Data.backend?.[id]==="demo")r=new DemoRepo(m,()=>demoRows(id));
+  else if(CFG.DEMO_CHAIN||Data.backend?.[id]==="demo")r=new DemoRepo(m,()=>demoRows(id));
   else r=new SupabaseRepo(m,user);
   Data.raw[id]=r;Data.repos[id]=guard(m,r)}
 export async function setBackend(id,kind){
   if(DISABLED.has(id))throw new Error("This table is disabled; real farms and CWS stay on the Portal.");
-  if(CFG.OFFLINE_DEMO)throw new Error("Offline demo is active; storage can be switched once Supabase is configured.");
+  if(CFG.DEMO_CHAIN)throw new Error("Demo chain mode is active; storage can be switched once Supabase is configured.");
   if(!Data.me?.isAdmin)throw new Error("Only admins can change the preview setting.");
   Data.backend??={};if(kind==="demo")Data.backend[id]="demo";else delete Data.backend[id];
   localStorage.setItem("eudr.backend",JSON.stringify(Data.backend));Data.warnings=[];Object.keys(Data.all).forEach(build)}

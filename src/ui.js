@@ -3,7 +3,7 @@ export const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",
 export const N=n=>Math.round(n||0).toLocaleString();
 export const COL={low:"#2f8f68",review:"#e0a030",blocked:"#c8472f",none:"#9b958a"};
 export const LBL={low:"Low risk",review:"Needs review",blocked:"Blocked",none:"No data"};
-const SRC={live:["Real","real","Read live from NAEB's existing layers"],recorded:["Recorded","recorded","Entered in this system and stored in the portal"],indicative:["Indicative","indicative","Generated or inferred for demonstration — not a real record"],mixed:["Mixed","mixed","Contains real/recorded and indicative records"]};
+const SRC={live:["Real","real","Read live from NAEB's existing layers"],recorded:["Recorded","recorded","Entered in this system and stored in Supabase"],indicative:["Indicative","indicative","Generated or inferred for demonstration — not a real record"],mixed:["Mixed","mixed","Contains real/recorded and indicative records"]};
 export const tag=s=>SRC[s]?`<span class="tag ${SRC[s][1]}" title="${SRC[s][2]}">${SRC[s][0]}</span>`:"";
 export const link=l=>`<span class="tag ${l==="inferred"?"indicative":"real"}" title="${l==="inferred"?"No record links these: shown as a possibility only":"A record links these"}">${l==="inferred"?"inferred":"confirmed"}</span>`;
 export const pill=r=>`<span class="pill" style="background:${COL[r]}">${LBL[r]}</span>`;

@@ -8,13 +8,13 @@ const CHAIN=["cherry_delivery","lot","lot_delivery","export_batch","batch_lot","
 export async function renderAdmin(){
   const me=Data.me,rows=await Promise.all(status().map(async s=>({...s,n:await Data.repo(s.id).count().catch(()=>"?")})));
   const demo=rows.filter(r=>r.mode==="demo").length;
-  $("#v-admin").innerHTML=`<div class="vh"><h2>Data models</h2><span class="muted">${CFG.OFFLINE_DEMO?"Portal sign-in is working; Supabase is not connected yet. The data below is indicative and is not saved.":"Every record is stored in Supabase. The Portal is only the login and the home of personal data."}</span><span class="sp"></span>
-   ${me.isAdmin&&!CFG.OFFLINE_DEMO?`<button class="ghost" id="demoToggle">${CHAIN.every(i=>Data.backend[i]==="demo")?"Stop previewing demo data":"Preview the chain with demo data"}</button> <button class="ghost" id="selfTest">Test saving</button>`:""}</div>
+  $("#v-admin").innerHTML=`<div class="vh"><h2>Data models</h2><span class="muted">${CFG.DEMO_CHAIN?"Farms, farmers and CWS come from Portal. Supabase is not connected yet; chain records below are indicative and are not saved.":"Every chain record is stored in Supabase. Farms, farmers and CWS stay in Portal."}</span><span class="sp"></span>
+   ${me.isAdmin&&!CFG.DEMO_CHAIN?`<button class="ghost" id="demoToggle">${CHAIN.every(i=>Data.backend[i]==="demo")?"Stop previewing demo data":"Preview the chain with demo data"}</button> <button class="ghost" id="selfTest">Test saving</button>`:""}</div>
    <div class="cards"><div class="cc"><span class="muted">Signed in as</span><b>${esc(me.fullName)}</b> ${esc(me.role)}${me.stations.length?` · ${me.stations.length} station(s)`:""}</div>
-   <div class="cc"><span class="muted">Storage</span><b>${CFG.OFFLINE_DEMO?"Offline demo":"Supabase"}</b>${CFG.OFFLINE_DEMO?"Indicative only; nothing is saved.":"All app-owned records."}</div>
+   <div class="cc"><span class="muted">Storage</span><b>${CFG.DEMO_CHAIN?"Demo chain":"Supabase"}</b>${CFG.DEMO_CHAIN?"Chain records only; indicative and not saved.":"All app-owned records."}</div>
    <div class="cc"><span class="muted">Portal data</span><b>Farms, farmers, CWS</b>Real plots, personal identity and washing stations stay in ArcGIS; the app reads them with your Portal login.</div>
    <div class="cc"><span class="muted">Data status</span><b>${rows.length-demo} stored · ${demo} demo</b>Demo rows are labelled Indicative and are not saved.</div></div>
-   ${CFG.OFFLINE_DEMO?`<p class="err">⚠ Temporary offline demo: Portal sign-in is still required. Set CFG.OFFLINE_DEMO to false after Supabase is configured.</p>`:""}${Data.warnings.map(w=>`<p class="err">⚠ ${esc(w)}</p>`).join("")}
+   ${CFG.DEMO_CHAIN?`<p class="err">⚠ Demo chain mode: Portal sign-in and Portal farm/CWS reads are live. Set CFG.DEMO_CHAIN to false after Supabase is configured.</p>`:""}${Data.warnings.map(w=>`<p class="err">⚠ ${esc(w)}</p>`).join("")}
    <div class="scroll models"><table><thead><tr><th>Model</th><th>Records</th><th>Stored in</th><th></th></tr></thead><tbody>${rows.map(r=>{const m=Data.models[r.id]||Data.system[r.id];
      return`<tr><td><b>${esc(m.name)}</b><small class="muted">${m.fields.length} fields · key ${esc(m.key)}</small></td><td>${r.n}</td><td>${r.mode==="demo"?"Demo (not saved)":r.mode==="disabled"?"Portal only (disabled)":"Supabase"} ${tag(r.source)}</td>
      <td><button class="ghost" data-prev="${r.id}">Preview</button></td></tr>`}).join("")}</tbody></table></div>

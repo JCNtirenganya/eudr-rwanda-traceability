@@ -12,6 +12,6 @@ export const CFG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY",
   API_URL: "",                   // empty = SUPABASE_URL + "/functions/v1/api"
-  OFFLINE_DEMO: true,            // temporary: Portal sign-in, then indicative chain data (no Supabase yet)
+  DEMO_CHAIN: true,              // temporary: chain records are indicative; farms/farmers/CWS come from Portal
   MIN_CHERRY_PRICE: 800,         // NAEB minimum cherry price (RWF/kg), set by NAEB per season
 };

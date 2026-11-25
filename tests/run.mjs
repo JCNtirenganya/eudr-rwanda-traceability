@@ -53,7 +53,7 @@ await t("demo chain: deliveries → lots → batches are consistent and indicati
   assert.ok(ld.every(x=>dids.has(x.delivery_id)&&lids.has(x.lot_id)));assert.ok(bl.every(x=>lids.has(x.lot_id)&&bids.has(x.batch_id)));
   const sumLot=Object.fromEntries(l.map(x=>[x.lot_id,x.cherry_kg_in]));const got={};ld.forEach(x=>got[x.lot_id]=(got[x.lot_id]||0)+x.kg_allocated);
   for(const k in sumLot)assert.ok(Math.abs(sumLot[k]-got[k])<d.length,"lot kg ≈ allocated deliveries "+k)});
-await t("offline demo base supplies indicative farms and stations",async()=>{const {demoBase}=await import("../src/data/demo.js"),b=await demoBase();
+await t("local demo helper supplies indicative rows only for tests",async()=>{const {demoBase}=await import("../src/data/demo.js"),b=await demoBase();
   assert.ok(b.farms.length>=100&&b.stations.length>=20);assert.equal(await demoBase(),b,"base is cached");
   assert.ok(b.farms.every(f=>f.type==="plot"&&f.src==="indicative"&&f.ring.length>=4&&f.eudr));
   assert.ok(b.stations.every(s=>s.type==="station"&&s.src==="indicative"&&s.lat&&s.lng));
@@ -82,10 +82,10 @@ await t("price floor is 800 RWF/kg: 799 warns, 800 and 1200 do not",async()=>{co
  await t("a plot geometry problem still blocks, whatever the date",()=>{assert.equal(screen({...F,overlaps_other_plot:"overlap"},Date.UTC(2015,0,1))[0],"blocked")});
  await t("planting year no longer decides the result (planting after 2020 on pre-2021 farmland is fine)",()=>{assert.equal(screen({...F,first_planting_year:2023},Date.UTC(2019,0,1))[0],"low")});
  await t("conversion date parsing: epoch ms, ISO date, and a bare year",()=>{assert.equal(toMs(Date.UTC(2019,3,2)),Date.UTC(2019,3,2));assert.equal(toMs("2019-04-02"),Date.parse("2019-04-02"));assert.equal(toMs(2019),Date.UTC(2019,11,31));assert.equal(toMs(""),null);assert.equal(toMs(2021),Date.UTC(2021,11,31))})}
-// ---- regression: link models must be non-empty when read through the real Data registry (demo mode) ----
+// ---- regression: link models must be non-empty when read through the real Data registry (demo chain mode) ----
 {const mem=()=>({_:{},getItem(k){return this._[k]??null},setItem(k,v){this._[k]=String(v)},removeItem(k){delete this._[k]}});globalThis.localStorage=mem();
  localStorage.setItem("eudr.backend",JSON.stringify(Object.fromEntries(["cherry_delivery","lot","lot_delivery","export_batch","batch_lot"].map(x=>[x,"demo"]))));
- const real=globalThis.fetch;const j=o=>({ok:true,status:200,json:async()=>o});const {CFG}=await import("../src/config.js");CFG.OFFLINE_DEMO=true;let apiCalls=0,selfCalls=0;
+ const real=globalThis.fetch;const j=o=>({ok:true,status:200,json:async()=>o});const {CFG}=await import("../src/config.js");CFG.DEMO_CHAIN=true;let apiCalls=0,selfCalls=0;
  globalThis.fetch=async(u,opt)=>{const s=String(u);
    if(s.includes("functions/v1/api")){apiCalls++;const b=JSON.parse(opt.body);
      if(b.action==="me")return j({ok:true,value:{username:"u",fullName:"U",isAdmin:true,role:"admin",stations:[]}});
@@ -95,7 +95,7 @@ await t("price floor is 800 RWF/kg: 799 warns, 800 and 1200 do not",async()=>{co
    if(s.includes("community/self")){selfCalls++;return j({username:"u",fullName:"U",role:"org_admin"})}return j({})};
  const {Data,DISABLED,init}=await import("../src/data/index.js");
  await init({farms,stations:stations.map(s=>({...s,type:"station"})),fetchSeed:async()=>seed});
-  await t("offline demo opens with Portal identity and no Supabase calls",()=>{assert.equal(apiCalls,0);assert.ok(selfCalls>=1);assert.equal(Data.me.username,"u");assert.equal(Data.me.fullName,"U");assert.equal(Data.me.isAdmin,true);assert.ok(Object.entries(Data.raw).filter(([id])=>!DISABLED.has(id)).every(([,r])=>r.kind==="demo"));
+  await t("demo chain opens with Portal identity and no Supabase calls",()=>{assert.equal(apiCalls,0);assert.ok(selfCalls>=1);assert.equal(Data.me.username,"u");assert.equal(Data.me.fullName,"U");assert.equal(Data.me.isAdmin,true);assert.ok(Object.entries(Data.raw).filter(([id])=>!DISABLED.has(id)).every(([,r])=>r.kind==="demo"));
      assert.ok(Object.entries(Data.raw).filter(([id])=>DISABLED.has(id)).every(([,r])=>r.kind==="disabled"))});
   await t("disabled support tables cannot be written",async()=>{for(const id of DISABLED){const r=Data.repo(id);if(r)await assert.rejects(r.create({}),/not allowed|disabled/)}});
  await t("registry: lot–delivery and batch–lot demo links are non-empty and consistent",async()=>{

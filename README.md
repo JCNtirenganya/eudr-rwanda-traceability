@@ -10,9 +10,9 @@ Run locally with `python -m http.server` → http://localhost:8000. Deploy: push
 
 ## Current state
 
-`CFG.OFFLINE_DEMO` in `src/config.js` is **temporarily `true`**. Portal sign-in is still required; after a successful Portal token the app opens with **indicative** farms, stations and chain records generated in the browser. Nothing is saved, and a banner says so. This lets the deployed link work while Supabase is being configured.
+`CFG.DEMO_CHAIN` in `src/config.js` is **temporarily `true`**. Portal sign-in is still required; after a successful Portal token the app reads **real** farms, farmers and CWS live from Portal. Only the chain records (deliveries, lots, batches, exporters, importers) are **indicative** and generated in the browser. Nothing chain-related is saved, and a banner says so. This lets the deployed link work while Supabase is being configured.
 
-Set `CFG.OFFLINE_DEMO` to `false` after the Supabase steps below. Sign-in stays the same, but farms/CWS are read directly from Portal and chain records are saved to Supabase.
+Set `CFG.DEMO_CHAIN` to `false` after the Supabase steps below. Sign-in and Portal farm/CWS reads stay the same; chain records are then saved to Supabase.
 
 If sign-in fails, the message shows Portal's own detail (for example, `Invalid username or password.`). Use the **exact Portal username**, not an email address unless that email is the username. Confirm it by signing in at https://gis.naeb.gov.rw/portal.
 
@@ -100,7 +100,7 @@ With schema, function and secrets ready, run **Actions → Migrate chain tables 
 
 ### 6. Cut over and verify
 
-1. Set `CFG.OFFLINE_DEMO` to `false` in `src/config.js` and push.
+1. Set `CFG.DEMO_CHAIN` to `false` in `src/config.js` and push.
 2. Sign in on the deployed site with the same Portal account.
 3. Confirm the status line shows the real farm polygons and stations from Portal.
 4. Open **Find a farmer in Portal** from the Record menu and look up a known National ID.
